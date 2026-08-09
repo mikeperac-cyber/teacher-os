@@ -13,4 +13,5 @@ export * from "./library";
 export * from "./planning";
 export * from "./students";
 export * from "./teaching";
+export * from "./triage";
 export * from "./workspace";

@@ -481,6 +481,140 @@ export type StudentPulse = {
 };
 
 /* ------------------------------------------------------------------ */
+/* Triage source records                                               */
+/* ------------------------------------------------------------------ */
+/* These feed the dashboard derivations in `lib/dashboard/`. They carry ISO   */
+/* timestamps rather than the pre-rendered strings used by the directory      */
+/* views above, because triage has to do arithmetic on them — how overdue,    */
+/* how many days inactive, how long until the lesson starts.                  */
+
+/** A scheduled lesson with everything the next-up panel and prep check need. */
+export type UpcomingLesson = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentInitials: string;
+  tone: Tone;
+  track: Track;
+  /** Course and level, e.g. "IELTS Academic · Band 6.0 → 7.0". */
+  courseLabel: string;
+  /** ISO start timestamp. */
+  startsAt: string;
+  /** ISO end timestamp. */
+  endsAt: string;
+  /** ESL: communicative outcome. IELTS: band objective. Null if unplanned. */
+  objective: string | null;
+  hasPlan: boolean;
+  /** Materials attached to the plan. */
+  materialCount: number;
+  /** Whether the previous homework has been checked and returned. */
+  homeworkReturned: boolean;
+  /** ISO timestamp of the last goal review, or null if never reviewed. */
+  goalsReviewedAt: string | null;
+  /** Post-class notes from this student's previous lesson. */
+  lastNotes: string | null;
+};
+
+/**
+ * Raw triage facts for one learner.
+ *
+ * Kept separate from `StudentRow` / `IeltsCandidateRow` because those describe
+ * how a learner is *displayed* in a directory, whereas this describes what the
+ * system *knows* about their engagement. Mixing them would force directory
+ * queries to carry risk columns they never render.
+ */
+export type StudentSignal = {
+  studentId: string;
+  name: string;
+  initials: string;
+  tone: Tone;
+  track: Track;
+  /** ISO timestamp of the last lesson, submission or sign-in. */
+  lastActiveAt: string | null;
+  /** Assignments past their due date with no submission. */
+  missedHomework: number;
+  /** ISO timestamp of the most recent recorded progress change. */
+  lastProgressAt: string | null;
+  /** ESL only: overall CEFR mastery, 0–100, most recent last. */
+  masteryHistory?: number[];
+  /** IELTS only: overall band, most recent last. */
+  bandHistory?: number[];
+  /** IELTS only. */
+  targetBand?: number;
+  /** IELTS only: ISO date of the official test. */
+  testDate?: string | null;
+};
+
+/** Homework awaiting the teacher. Backed by `homework_submissions`. */
+export type PendingHomework = {
+  id: string;
+  studentName: string;
+  studentInitials: string;
+  tone: Tone;
+  track: Track;
+  task: string;
+  /** ISO timestamp the teacher should return it by. */
+  dueAt: string | null;
+  /** Lesson this must be returned before, if any. */
+  blocksLessonId: string | null;
+  /** Estimated marking time. */
+  minutes: number | null;
+};
+
+/** An assessment whose scores have not been recorded. Backed by `assessments`. */
+export type PendingAssessment = {
+  id: string;
+  studentName: string;
+  studentInitials: string;
+  tone: Tone;
+  track: Track;
+  title: string;
+  /** ESL: evidence type. IELTS: mock or section. */
+  kind: string;
+  dueAt: string | null;
+  blocksLessonId: string | null;
+  minutes: number | null;
+};
+
+/** A task with a real timestamp, for inbox ranking. Backed by `tasks`. */
+export type ScheduledTask = {
+  id: string;
+  title: string;
+  detail: string;
+  dueAt: string | null;
+  priority: Priority;
+  minutes: number | null;
+  track: Track | null;
+  tone: Tone;
+};
+
+/** A student goal with a scheduled review. Backed by `goals`. */
+export type ScheduledGoalReview = {
+  id: string;
+  studentName: string;
+  studentInitials: string;
+  tone: Tone;
+  track: Track;
+  title: string;
+  /** ISO date the review is due. */
+  reviewDueAt: string;
+  /** 0–100. */
+  progress: number;
+};
+
+/**
+ * How many lessons the teacher is willing to take on a given day.
+ *
+ * Capacity is a preference, not a record of bookings — it is what makes
+ * overbooking and empty days detectable rather than merely visible.
+ */
+export type DayCapacity = {
+  /** ISO date. */
+  date: string;
+  capacity: number;
+};
+
+/* ------------------------------------------------------------------ */
 /* Positional label constants                                          */
 /* ------------------------------------------------------------------ */
 /* These are official criterion names, not demo data. They define the order  */

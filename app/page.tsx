@@ -29,7 +29,6 @@ import {
   ChevronDown,
   ChevronRight,
   Circle,
-  ClipboardCheck,
   Clock3,
   Command,
   FileCheck2,
@@ -38,7 +37,6 @@ import {
   FolderKanban,
   Gauge,
   GraduationCap,
-  Inbox,
   ListTodo,
   MessageSquareText,
   Mic2,
@@ -49,7 +47,6 @@ import {
   Play,
   Plus,
   Search,
-  Sparkles,
   Target,
   TrendingUp,
   UserRound,
@@ -57,39 +54,33 @@ import {
   Video,
   WandSparkles,
   X,
-  Zap,
 } from "lucide-react";
-import type { ElementType } from "react";
-
+import { EmptyState, PanelHeader } from "@/components/primitives";
+import { CreateRecordModal } from "@/components/dashboard/QuickActions";
+import {
+  ESLDashboard,
+  IELTSDashboard,
+} from "@/components/dashboard/TrackDashboards";
+import type { RecordKind } from "@/lib/actions/create-record";
 import { areaMetaFor } from "@/lib/content/area-meta";
 import { areaFromSlug, areaSlug } from "@/lib/navigation/areas";
 import { buildDestination } from "@/lib/navigation/destination";
 import { sharedNavGroups, trackNavGroups } from "@/lib/navigation/nav-config";
 import {
-  currentWorkflowStage,
-  stageArea,
-  stageState,
-  workflowStages,
-} from "@/lib/navigation/workflow";
-import {
   HOMEWORK_COLUMN_LABELS,
   HOMEWORK_COLUMNS,
   activeLessonPlanByTrack,
-  attentionByTrack,
   calendarEvents,
   cefrDistribution,
   collectionsByTrack,
   currentUser,
   dayBlocksByTrack,
   eslProgressRows,
-  eslPulseRows,
   eslStudents,
-  eslSystemScores,
   goals,
   homeworkBoardByTrack,
   ieltsBandRows,
   ieltsCandidates,
-  ieltsSkillAverages,
   ieltsSpeakingRows,
   ieltsWritingRows,
   languageSystemRows,
@@ -97,14 +88,12 @@ import {
   markingQueueByTrack,
   materialSkillFiltersByTrack,
   materials,
-  priorityQueueByTrack,
   projectCategories,
   projects,
   recentMaterialsByTrack,
   reportsByTrack,
   searchResultsByTrack,
   speakingPartAverages,
-  studentCountByTrack,
   taskGroups,
   upcomingAssessmentsByTrack,
   weeklyGoalByTrack,
@@ -113,13 +102,11 @@ import {
 } from "@/lib/fixtures";
 import { ESL_SKILL_LABELS } from "@/lib/types/domain";
 import type { HomeworkBoard, HomeworkColumn } from "@/lib/types/domain";
+import type { DeepLink } from "@/lib/types/dashboard";
 import type { Announce, Area, DestinationPanel, Track } from "@/lib/types/ui";
 
 /** Shown wherever a figure cannot be computed because there are no records. */
 const NO_VALUE = "—";
-
-/** Formats a count that is legitimately zero rather than unknown. */
-const count = (value: number) => String(value);
 
 /** Formats a percentage that cannot be derived without records. */
 const percent = (value: number | null) =>
@@ -129,10 +116,10 @@ export default function Home() {
   const [activeTrack, setActiveTrack] = useState<Track>("ESL");
   const [activeArea, setActiveArea] = useState<Area>("Dashboard");
   const [sidebarCompact, setSidebarCompact] = useState(false);
-  const [completedTasks, setCompletedTasks] = useState<number[]>([]);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showLessonPanel, setShowLessonPanel] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [quickCreate, setQuickCreate] = useState<RecordKind | null>(null);
   const [destination, setDestination] = useState<DestinationPanel | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const navGroups = useMemo(
@@ -165,16 +152,24 @@ export default function Home() {
     );
   };
 
-  const navigateTo = (area: Area) => {
+  const navigateTo = (area: Area, detail?: string) => {
     setActiveArea(area);
     setDestination(null);
     setShowQuickAdd(false);
     setShowSearch(false);
-    syncUrl(activeTrack, area);
+    syncUrl(activeTrack, area, detail);
     window.requestAnimationFrame(() =>
       document.querySelector(".main-content")?.scrollTo({ top: 0, behavior: "smooth" }),
     );
   };
+
+  /**
+   * Follows a deep link from a dashboard triage item.
+   *
+   * Every item on the dashboard carries its own destination so it is actionable
+   * in one click — that is what makes it triage rather than a report.
+   */
+  const navigate = (link: DeepLink) => navigateTo(link.area, link.detail);
 
   const changeTrack = (track: Track) => {
     setActiveTrack(track);
@@ -228,12 +223,6 @@ export default function Home() {
       window.removeEventListener("popstate", restoreLocation);
     };
   }, []);
-
-  const completeTask = (id: number) => {
-    setCompletedTasks((items) =>
-      items.includes(id) ? items.filter((item) => item !== id) : [...items, id],
-    );
-  };
 
   const announce: Announce = (message, openPanel) => {
     setToast(message);
@@ -379,11 +368,32 @@ export default function Home() {
                 <Plus size={17} /> Quick add <ChevronDown size={14} />
               </button>
               {showQuickAdd && (
+                /* Same modal as the dashboard's quick-action row — one write
+                   path, so "Add student" means the same thing wherever the
+                   teacher reaches for it. */
                 <div className="quick-menu">
                   <button
                     onClick={() => {
-                      navigateTo("Lesson Planner");
-                      announce(`Create new ${activeTrack} lesson`);
+                      setShowQuickAdd(false);
+                      setQuickCreate("student");
+                    }}
+                  >
+                    <UserRound size={17} />
+                    <span>
+                      <strong>
+                        {activeTrack === "ESL" ? "ESL learner" : "IELTS candidate"}
+                      </strong>
+                      <small>
+                        {activeTrack === "ESL"
+                          ? "Create a CEFR learner profile"
+                          : "Create a band-score profile"}
+                      </small>
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowQuickAdd(false);
+                      setQuickCreate("lesson");
                     }}
                   >
                     <BookOpen size={17} />
@@ -398,30 +408,16 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => {
-                      navigateTo("Tasks");
-                      announce("Create new task");
+                      setShowQuickAdd(false);
+                      setQuickCreate("homework");
                     }}
                   >
                     <ListTodo size={17} />
                     <span>
-                      <strong>Task</strong>
-                      <small>Capture a next action</small>
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigateTo("Students");
-                      announce(`Create new ${activeTrack} student`);
-                    }}
-                  >
-                    <UserRound size={17} />
-                    <span>
-                      <strong>{activeTrack} student</strong>
-                      <small>
-                        {activeTrack === "ESL"
-                          ? "Create a CEFR learner profile"
-                          : "Create a band-score profile"}
-                      </small>
+                      <strong>
+                        {activeTrack === "ESL" ? "ESL homework" : "IELTS practice"}
+                      </strong>
+                      <small>Assign the next piece of work</small>
                     </span>
                   </button>
                 </div>
@@ -433,19 +429,15 @@ export default function Home() {
         <main className="main-content">
           {activeArea === "Dashboard" ? (
             activeTrack === "ESL" ? (
-              <ESLDashboardView
-                completedTasks={completedTasks}
-                completeTask={completeTask}
-                setActiveArea={navigateTo}
-                openLesson={() => setShowLessonPanel(true)}
+              <ESLDashboard
+                navigate={navigate}
+                onStartLesson={() => setShowLessonPanel(true)}
                 announce={announce}
               />
             ) : (
-              <IELTSDashboardView
-                completedTasks={completedTasks}
-                completeTask={completeTask}
-                setActiveArea={navigateTo}
-                openLesson={() => setShowLessonPanel(true)}
+              <IELTSDashboard
+                navigate={navigate}
+                onStartLesson={() => setShowLessonPanel(true)}
                 announce={announce}
               />
             )
@@ -504,6 +496,14 @@ export default function Home() {
         </div>
       )}
 
+      {quickCreate && (
+        <CreateRecordModal
+          kind={quickCreate}
+          track={activeTrack}
+          close={() => setQuickCreate(null)}
+        />
+      )}
+
       {showSearch && (
         <GlobalSearch
           track={activeTrack}
@@ -530,760 +530,6 @@ export default function Home() {
         </div>
       )}
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Shared presentation                                                 */
-/* ------------------------------------------------------------------ */
-
-/**
- * The state every screen is in until Supabase is connected.
- *
- * Uses `.table-empty`, which already exists in `app/globals.css`, so empty
- * states inherit the design system rather than introducing new styling.
- */
-function EmptyState({
-  icon: Icon = Inbox,
-  title,
-  hint,
-}: {
-  icon?: ElementType;
-  title: string;
-  hint: string;
-}) {
-  return (
-    <div className="table-empty">
-      <Icon size={22} />
-      <strong>{title}</strong>
-      <span>{hint}</span>
-    </div>
-  );
-}
-
-function PanelHeader({
-  kicker,
-  title,
-  action,
-}: {
-  kicker: string;
-  title: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="panel-head">
-      <div>
-        <span className="section-kicker">{kicker}</span>
-        <h2>{title}</h2>
-      </div>
-      {action}
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  note,
-  icon: Icon,
-  tone,
-  onOpen,
-}: {
-  label: string;
-  value: string;
-  note: string;
-  icon: ElementType;
-  tone: string;
-  onOpen: () => void;
-}) {
-  return (
-    <button className="metric-card" onClick={onOpen} aria-label={`Open ${label}`}>
-      <div className={`metric-icon ${tone}`}>
-        <Icon size={19} />
-      </div>
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-        <small>{note}</small>
-      </div>
-      <span className="metric-open">
-        <ArrowRight size={15} />
-      </span>
-    </button>
-  );
-}
-
-/** The nine-stage lesson lifecycle. Structure is fixed; progress is data. */
-function WorkflowLine({
-  track,
-  setActiveArea,
-}: {
-  track: Track;
-  setActiveArea: (area: Area) => void;
-}) {
-  return (
-    <div className="workflow-line">
-      {workflowStages.map((step, index) => {
-        const Icon = step.icon;
-        const state = stageState(index, currentWorkflowStage);
-        return (
-          <button
-            key={step.label}
-            className={`workflow-step ${state}`}
-            onClick={() => setActiveArea(stageArea(index, track))}
-          >
-            <span>
-              <Icon size={16} />
-              {state === "done" && (
-                <i>
-                  <Check size={10} />
-                </i>
-              )}
-            </span>
-            <small>{step.label}</small>
-            {index < workflowStages.length - 1 && <b />}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Dashboards — one per track, never merged                            */
-/* ------------------------------------------------------------------ */
-
-type TrackDashboardProps = {
-  completedTasks: number[];
-  completeTask: (id: number) => void;
-  setActiveArea: (area: Area) => void;
-  openLesson: () => void;
-  announce: Announce;
-};
-
-function ESLDashboardView({
-  completedTasks,
-  completeTask,
-  setActiveArea,
-  announce,
-}: TrackDashboardProps) {
-  const tasks = priorityQueueByTrack.ESL;
-  const plan = activeLessonPlanByTrack.ESL;
-  const attention = attentionByTrack.ESL;
-
-  return (
-    <>
-      <section className="page-heading dashboard-heading track-heading">
-        <div>
-          <p className="eyebrow">
-            <span className="track-context-chip esl">ESL · CEFR WORKSPACE</span>
-          </p>
-          <h1>ESL teaching dashboard</h1>
-          <p>
-            Communicative outcomes, CEFR mastery and language development for your
-            ESL learners.
-          </p>
-        </div>
-        <button
-          className="secondary-button"
-          onClick={() => announce("ESL day optimized around CEFR outcomes")}
-        >
-          <Sparkles size={16} /> Plan ESL day
-        </button>
-      </section>
-
-      <section className="stat-grid">
-        <MetricCard
-          label="Active ESL students"
-          value={count(studentCountByTrack.ESL)}
-          note="No learners yet"
-          icon={Users}
-          tone="mint"
-          onOpen={() => setActiveArea("Students")}
-        />
-        <MetricCard
-          label="ESL lessons today"
-          value={count(dayBlocksByTrack.ESL.length)}
-          note="Nothing scheduled"
-          icon={BookOpen}
-          tone="blue"
-          onOpen={() => setActiveArea("Today")}
-        />
-        <MetricCard
-          label="Homework to check"
-          value={count(homeworkBoardByTrack.ESL.submitted.length)}
-          note="Nothing submitted"
-          icon={ClipboardCheck}
-          tone="amber"
-          onOpen={() => setActiveArea("Homework")}
-        />
-        <MetricCard
-          label="CEFR mastery"
-          value={NO_VALUE}
-          note="Needs progress records"
-          icon={TrendingUp}
-          tone="mint"
-          onOpen={() => setActiveArea("ESL Progress")}
-        />
-      </section>
-
-      <section className="dashboard-grid track-dashboard">
-        <div className="dashboard-main-column">
-          <article className="track-hero-card esl">
-            <div className="track-hero-top">
-              <span>
-                <Zap size={14} fill="currentColor" /> NEXT ESL LESSON
-              </span>
-            </div>
-            {plan ? (
-              <div className="track-hero-body">
-                <div>
-                  <h2>{plan.student}</h2>
-                  <p>{plan.course}</p>
-                </div>
-              </div>
-            ) : (
-              <div className="track-hero-body">
-                <div>
-                  <h2>No lesson scheduled</h2>
-                  <p>
-                    Create an ESL student, then schedule their first lesson to start
-                    the teaching workflow.
-                  </p>
-                </div>
-              </div>
-            )}
-            <div className="track-hero-footer">
-              <p>
-                <span>Communicative outcome</span>
-                {plan?.objective ?? "Set once a lesson is scheduled"}
-              </p>
-              <div>
-                <button onClick={() => setActiveArea("Students")}>
-                  <UserRound size={15} /> Add ESL student
-                </button>
-                <button onClick={() => setActiveArea("Lesson Planner")}>
-                  Open planner <ArrowRight size={15} />
-                </button>
-              </div>
-            </div>
-          </article>
-
-          <article className="panel workflow-panel">
-            <div className="panel-head">
-              <div>
-                <span className="section-kicker">ESL lesson lifecycle</span>
-                <h2>Class workflow</h2>
-              </div>
-              <span className="stage-pill">
-                {currentWorkflowStage === null
-                  ? "Not started"
-                  : `Step ${currentWorkflowStage + 1} of ${workflowStages.length}`}
-              </span>
-            </div>
-            <WorkflowLine track="ESL" setActiveArea={setActiveArea} />
-          </article>
-
-          <article className="panel track-matrix-panel">
-            <PanelHeader
-              kicker="CEFR learner pulse"
-              title="Mastery and independent use"
-              action={
-                <button
-                  className="text-button"
-                  onClick={() => setActiveArea("ESL Progress")}
-                >
-                  Full CEFR tracker <ArrowRight size={14} />
-                </button>
-              }
-            />
-            {eslPulseRows.length ? (
-              <>
-                <div className="track-matrix-head">
-                  <span>Learner</span>
-                  <span>CEFR</span>
-                  <span>Unit mastery</span>
-                  <span>Independent use</span>
-                  <span>Confidence</span>
-                  <span />
-                </div>
-                {eslPulseRows.map((row) => (
-                  <button
-                    className="track-matrix-row"
-                    key={row.name}
-                    onClick={() => setActiveArea("ESL Progress")}
-                  >
-                    <span className={`avatar avatar-small avatar-${row.tone}`}>
-                      {row.name
-                        .split(" ")
-                        .map((part) => part[0])
-                        .join("")}
-                    </span>
-                    <span>
-                      <strong>{row.name}</strong>
-                      <small>1:1 ESL</small>
-                    </span>
-                    <b>{row.cefr}</b>
-                    <span className="matrix-meter">
-                      <i>
-                        <em style={{ width: row.mastery }} />
-                      </i>
-                      <b>{row.mastery}</b>
-                    </span>
-                    <span className="matrix-meter">
-                      <i>
-                        <em style={{ width: row.independent }} />
-                      </i>
-                      <b>{row.independent}</b>
-                    </span>
-                    <span className="matrix-meter">
-                      <i>
-                        <em style={{ width: row.confidence }} />
-                      </i>
-                      <b>{row.confidence}</b>
-                    </span>
-                    <ChevronRight size={15} />
-                  </button>
-                ))}
-              </>
-            ) : (
-              <EmptyState
-                icon={TrendingUp}
-                title="No CEFR evidence yet"
-                hint="Mastery appears once you record progress for a learner."
-              />
-            )}
-          </article>
-
-          <article className="panel priority-panel">
-            <PanelHeader
-              kicker="ESL priority queue"
-              title="What needs attention"
-              action={
-                <span className="muted-count">
-                  {tasks.filter((task) => !completedTasks.includes(task.id)).length}{" "}
-                  remaining
-                </span>
-              }
-            />
-            {tasks.length ? (
-              <div className="priority-list">
-                {tasks.map((item) => {
-                  const done = completedTasks.includes(item.id);
-                  return (
-                    <button
-                      key={item.id}
-                      className={`priority-row ${done ? "is-done" : ""}`}
-                      onClick={() => completeTask(item.id)}
-                    >
-                      <span className={`task-check ${done ? "checked" : ""}`}>
-                        {done && <Check size={14} />}
-                      </span>
-                      <span className={`priority-dot ${item.tone}`} />
-                      <span className="priority-copy">
-                        <strong>{item.title}</strong>
-                        <small>{item.meta}</small>
-                      </span>
-                      <span className="time-chip">
-                        <Clock3 size={13} />
-                        {item.tag}
-                      </span>
-                      <ChevronRight size={16} />
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <EmptyState
-                icon={CheckCircle2}
-                title="Nothing waiting"
-                hint="Tasks created for your ESL learners appear here."
-              />
-            )}
-          </article>
-        </div>
-
-        <aside className="dashboard-rail">
-          <article className="panel track-scorecard">
-            <PanelHeader kicker="ESL systems" title="Language mastery" />
-            {eslSystemScores.length ? (
-              <div className="system-bars">
-                {eslSystemScores.map((system) => (
-                  <button
-                    key={system.label}
-                    onClick={() => setActiveArea("Language Skills")}
-                  >
-                    <span>
-                      <strong>{system.label}</strong>
-                      <small>{system.delta}%</small>
-                    </span>
-                    <i>
-                      <em style={{ width: `${system.value}%` }} />
-                    </i>
-                    <b>{system.value}%</b>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={Activity}
-                title="No systems tracked"
-                hint="Grammar, vocabulary and fluency appear after the first lesson."
-              />
-            )}
-          </article>
-
-          <article className="panel schedule-panel">
-            <PanelHeader
-              kicker="Today · ESL only"
-              title="ESL teaching schedule"
-              action={
-                <button className="text-button" onClick={() => setActiveArea("Today")}>
-                  Full day
-                </button>
-              }
-            />
-            <EmptyState
-              icon={CalendarDays}
-              title="No ESL lessons today"
-              hint="Scheduled classes appear here in time order."
-            />
-          </article>
-
-          <article className="focus-card esl-focus">
-            <span className="focus-icon">
-              <Activity size={19} />
-            </span>
-            <div>
-              <span className="section-kicker">ESL insight</span>
-              <h3>Recognition ≠ production</h3>
-              <p>
-                Teacher OS tracks what a learner can use unprompted separately from
-                what they recognize. The gap between them is what to teach next.
-              </p>
-              <button onClick={() => setActiveArea("Language Skills")}>
-                Open language skills <ArrowRight size={13} />
-              </button>
-            </div>
-          </article>
-
-          <article className="panel attention-card">
-            <div className="attention-top">
-              <span>
-                <Activity size={16} />
-                ESL learners needing support
-              </span>
-              <b>{attention.length}</b>
-            </div>
-            {attention.length ? (
-              attention.map((item) => (
-                <button key={item.name} onClick={() => setActiveArea(item.area)}>
-                  <span className={`avatar avatar-small avatar-${item.tone}`}>
-                    {item.initials}
-                  </span>
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>{item.reason}</small>
-                  </span>
-                  <ChevronRight size={15} />
-                </button>
-              ))
-            ) : (
-              <EmptyState
-                icon={Users}
-                title="No learners flagged"
-                hint="Learners falling behind their CEFR target appear here."
-              />
-            )}
-          </article>
-        </aside>
-      </section>
-    </>
-  );
-}
-
-function IELTSDashboardView({
-  completedTasks,
-  completeTask,
-  setActiveArea,
-  announce,
-}: TrackDashboardProps) {
-  const tasks = priorityQueueByTrack.IELTS;
-  const plan = activeLessonPlanByTrack.IELTS;
-  const attention = attentionByTrack.IELTS;
-
-  return (
-    <>
-      <section className="page-heading dashboard-heading track-heading">
-        <div>
-          <p className="eyebrow">
-            <span className="track-context-chip ielts">IELTS ACADEMIC WORKSPACE</span>
-          </p>
-          <h1>IELTS performance dashboard</h1>
-          <p>
-            Band scores, mocks, rubric gaps and test readiness for your IELTS
-            candidates.
-          </p>
-        </div>
-        <button
-          className="secondary-button"
-          onClick={() => announce("IELTS day optimized around test risk")}
-        >
-          <Sparkles size={16} /> Prioritize test risk
-        </button>
-      </section>
-
-      <section className="stat-grid">
-        <MetricCard
-          label="IELTS candidates"
-          value={count(studentCountByTrack.IELTS)}
-          note="No candidates yet"
-          icon={Users}
-          tone="violet"
-          onOpen={() => setActiveArea("Students")}
-        />
-        <MetricCard
-          label="IELTS lessons today"
-          value={count(dayBlocksByTrack.IELTS.length)}
-          note="Nothing scheduled"
-          icon={BookOpen}
-          tone="blue"
-          onOpen={() => setActiveArea("Today")}
-        />
-        <MetricCard
-          label="Mocks to score"
-          value={count(markingQueueByTrack.IELTS.length)}
-          note="Nothing to mark"
-          icon={FileCheck2}
-          tone="amber"
-          onOpen={() => setActiveArea("Assessments")}
-        />
-        <MetricCard
-          label="Average band gain"
-          value={NO_VALUE}
-          note="Needs two mock results"
-          icon={Gauge}
-          tone="violet"
-          onOpen={() => setActiveArea("IELTS Progress")}
-        />
-      </section>
-
-      <section className="dashboard-grid track-dashboard">
-        <div className="dashboard-main-column">
-          <article className="track-hero-card ielts">
-            <div className="track-hero-top">
-              <span>
-                <Zap size={14} fill="currentColor" /> NEXT IELTS LESSON
-              </span>
-            </div>
-            <div className="track-hero-body">
-              <div>
-                <h2>{plan ? plan.student : "No lesson scheduled"}</h2>
-                <p>
-                  {plan
-                    ? plan.course
-                    : "Create an IELTS candidate with a target band and test date, then schedule their first lesson."}
-                </p>
-              </div>
-            </div>
-            <div className="track-hero-footer">
-              <p>
-                <span>Band objective</span>
-                {plan?.objective ?? "Set once a lesson is scheduled"}
-              </p>
-              <div>
-                <button onClick={() => setActiveArea("Students")}>
-                  <UserRound size={15} /> Add candidate
-                </button>
-                <button onClick={() => setActiveArea("Lesson Planner")}>
-                  Open planner <ArrowRight size={15} />
-                </button>
-              </div>
-            </div>
-          </article>
-
-          <article className="panel workflow-panel">
-            <div className="panel-head">
-              <div>
-                <span className="section-kicker">IELTS lesson lifecycle</span>
-                <h2>Class workflow</h2>
-              </div>
-              <span className="stage-pill">
-                {currentWorkflowStage === null
-                  ? "Not started"
-                  : `Step ${currentWorkflowStage + 1} of ${workflowStages.length}`}
-              </span>
-            </div>
-            <WorkflowLine track="IELTS" setActiveArea={setActiveArea} />
-          </article>
-
-          <article className="panel band-dashboard-panel">
-            <PanelHeader
-              kicker="Latest band matrix"
-              title="Candidate performance"
-              action={
-                <button
-                  className="text-button"
-                  onClick={() => setActiveArea("IELTS Progress")}
-                >
-                  Full band tracker <ArrowRight size={14} />
-                </button>
-              }
-            />
-            <EmptyState
-              icon={Gauge}
-              title="No band scores recorded"
-              hint="Listening, Reading, Writing and Speaking bands appear after the first mock."
-            />
-          </article>
-
-          <article className="panel priority-panel">
-            <PanelHeader
-              kicker="IELTS priority queue"
-              title="What needs attention"
-              action={
-                <span className="muted-count">
-                  {tasks.filter((task) => !completedTasks.includes(task.id)).length}{" "}
-                  remaining
-                </span>
-              }
-            />
-            {tasks.length ? (
-              <div className="priority-list">
-                {tasks.map((item) => {
-                  const done = completedTasks.includes(item.id);
-                  return (
-                    <button
-                      key={item.id}
-                      className={`priority-row ${done ? "is-done" : ""}`}
-                      onClick={() => completeTask(item.id)}
-                    >
-                      <span className={`task-check ${done ? "checked" : ""}`}>
-                        {done && <Check size={14} />}
-                      </span>
-                      <span className={`priority-dot ${item.tone}`} />
-                      <span className="priority-copy">
-                        <strong>{item.title}</strong>
-                        <small>{item.meta}</small>
-                      </span>
-                      <span className="time-chip">
-                        <Clock3 size={13} />
-                        {item.tag}
-                      </span>
-                      <ChevronRight size={16} />
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <EmptyState
-                icon={CheckCircle2}
-                title="Nothing waiting"
-                hint="Marking and prep tasks for your candidates appear here."
-              />
-            )}
-          </article>
-        </div>
-
-        <aside className="dashboard-rail">
-          <article className="panel track-scorecard">
-            <PanelHeader kicker="Cohort averages" title="IELTS skill bands" />
-            {ieltsSkillAverages.length ? (
-              <div className="band-average-grid">
-                {ieltsSkillAverages.map((entry) => (
-                  <button
-                    key={entry.skill}
-                    onClick={() =>
-                      setActiveArea(
-                        entry.skill === "Writing"
-                          ? "Writing Tracker"
-                          : entry.skill === "Speaking"
-                            ? "Speaking Tracker"
-                            : "IELTS Progress",
-                      )
-                    }
-                  >
-                    <span>{entry.skill}</span>
-                    <strong>{entry.band}</strong>
-                    <small>{entry.delta}</small>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={Gauge}
-                title="No cohort averages"
-                hint="Averages need at least one scored candidate."
-              />
-            )}
-          </article>
-
-          <article className="panel schedule-panel">
-            <PanelHeader
-              kicker="Today · IELTS only"
-              title="IELTS teaching schedule"
-              action={
-                <button className="text-button" onClick={() => setActiveArea("Today")}>
-                  Full day
-                </button>
-              }
-            />
-            <EmptyState
-              icon={CalendarDays}
-              title="No IELTS lessons today"
-              hint="Scheduled classes appear here in time order."
-            />
-          </article>
-
-          <article className="ielts-countdown-card">
-            <span className="focus-icon">
-              <Clock3 size={19} />
-            </span>
-            <div>
-              <span className="section-kicker">Nearest official test</span>
-              <h3>No test dates</h3>
-              <p>
-                Add a candidate’s official test date to track readiness against the
-                countdown.
-              </p>
-              <button onClick={() => setActiveArea("Students")}>
-                Add candidate <ArrowRight size={13} />
-              </button>
-            </div>
-          </article>
-
-          <article className="panel attention-card">
-            <div className="attention-top">
-              <span>
-                <Activity size={16} />
-                IELTS candidates at risk
-              </span>
-              <b>{attention.length}</b>
-            </div>
-            {attention.length ? (
-              attention.map((item) => (
-                <button key={item.name} onClick={() => setActiveArea(item.area)}>
-                  <span className={`avatar avatar-small avatar-${item.tone}`}>
-                    {item.initials}
-                  </span>
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>{item.reason}</small>
-                  </span>
-                  <ChevronRight size={15} />
-                </button>
-              ))
-            ) : (
-              <EmptyState
-                icon={Users}
-                title="No candidates flagged"
-                hint="Candidates below their target band appear here."
-              />
-            )}
-          </article>
-        </aside>
-      </section>
-    </>
   );
 }
 
