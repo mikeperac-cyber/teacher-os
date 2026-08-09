@@ -1,0 +1,31 @@
+# Line-ending policy.
+#
+# This machine has core.autocrlf=true (Windows default). Without this file a
+# fresh clone checks out scripts/*.sh with CRLF endings, and bash fails on the
+# trailing \r. That would make the baseline commit unusable as a revert point.
+#
+# The deployment target is Linux (Vercel), so LF is authoritative everywhere.
+
+* text=auto eol=lf
+
+# Shell scripts break outright with CRLF.
+*.sh text eol=lf
+
+# Binary assets: never normalize.
+*.woff2 binary
+*.woff  binary
+*.ttf   binary
+*.otf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.zip   binary
+*.pdf   binary
+*.mp3   binary
+*.m4a   binary
+*.wav   binary
+
+# Lockfiles are generated; keep diffs out of review noise.
+package-lock.json -diff linguist-generated
