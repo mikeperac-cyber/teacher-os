@@ -1,49 +1,70 @@
-# Current-state audit
+# Current state
 
-## What already works
+Last updated 10 August 2026, after Phase 1a.
 
-- ESL and IELTS workspace switching.
-- Separate track navigation and dashboard content.
-- URL-aware navigation using `track`, `view` and `detail` parameters.
-- Browser back/forward restoration for workspace views.
-- Global search overlay and keyboard shortcut.
-- Quick-add menu, detail drawers, lesson drawer and notifications.
-- Calendar view switching and week navigation.
-- Task completion, filtering and sorting during the current session.
-- Materials search and skill filtering.
-- Click handlers are present on every rendered button.
+For the original export's state, see `git show 294b548` and the version of this
+file at that commit.
 
-## What is simulated
+## Architecture
 
-- Students, lessons, schedules, homework, assessments, materials and reports.
-- Creating a record only changes drawer state.
-- Task completion and lesson checklist updates reset after refresh.
-- Search operates on in-file demonstration records.
-- Dashboard metrics and progress graphs are static.
-- No files are uploaded or downloaded.
-- No email, calendar or notification service is connected.
+- Standard **Next.js 16 App Router**, React 19, TypeScript, built and run with
+  the Next CLI. No WSL, bash helpers or GNU utilities required.
+- One route (`/`), a client component, with navigation expressed as
+  `?track=esl|ielts&view=<area>&detail=<slug>`.
+- Target deployment is Vercel with Supabase for Postgres, Auth and Storage —
+  see `adr/0001-production-runtime-and-database.md`.
 
-## Technical concentration
+```
+app/            route, layout, globals.css (untouched from the export), dashboard.css
+components/     primitives + dashboard triage panels
+lib/dashboard/  triage rules — pure functions, every one takes `now` explicitly
+lib/types/      domain.ts is the contract the Supabase schema derives from
+lib/fixtures/   the data seam; empty, replaced by queries one module at a time
+lib/actions/    write path, shaped like the server action it will become
+tests/          Vitest — 69 tests
+```
 
-- `app/page.tsx`: approximately 1,210 lines.
-- `app/globals.css`: approximately 780 lines.
-- `db/schema.ts`: no tables.
-- Most domain data is declared as constants above the page component.
-- Most destinations are views rendered inside one client-side route.
+## What works
 
-## Migration cautions
+- ESL / IELTS workspace switching, with genuinely separate dashboards,
+  navigation, progress models and reports.
+- URL-aware navigation, back/forward restoration, deep links.
+- Global search overlay and ⌘/Ctrl-K.
+- Dashboard triage: next-up lesson with prep blockers, merged action inbox,
+  at-risk learners, week capacity, goal reviews due, derived clickable stats.
+- Quick actions open a real modal with real validation, from both the dashboard
+  and the topbar.
+- Per-area filtering and sorting within a session.
+- Every screen has a designed empty state.
 
-- Preserve the current URL behavior while introducing real routes or data.
-- Extract domain modules gradually; a full first-pass rewrite would make
-  visual and interaction regressions difficult to identify.
-- Do not infer authorization from the selected ESL/IELTS tab.
-- Do not use one generic progress table for both tracks.
-- Do not treat toast messages or a saved drawer state as successful database
-  writes.
-- Keep the baseline interaction tests and add integration and permission tests.
+## What is not built yet
 
-## Verified baseline
+- **No database.** Every collection in `lib/fixtures/` returns empty, so every
+  screen renders its empty state. That is correct for a workspace with no
+  records, not a defect.
+- **No authentication.** The sidebar reads "Not signed in". Roles, Row Level
+  Security and the owner/teacher/student boundary are Phase 2.
+- **No persistence.** `createRecord` validates and then refuses, reporting that
+  nothing was stored. It must keep refusing until a database is behind it.
+- No file upload or download; no email or calendar integration.
+- Reports and several area screens are structure without data.
 
-The exported source passed its existing production build and four automated
-tests immediately before packaging.
+## Cautions carried forward
 
+- Preserve the URL behaviour when real routes or data arrive.
+- Do not infer authorization from the selected ESL/IELTS tab. It is a view
+  filter, not a boundary.
+- Do not use one generic progress table for both tracks. CEFR mastery and IELTS
+  bands are different measurements on different scales.
+- Do not treat a toast or a closed drawer as a successful write.
+- `lib/dashboard/` thresholds are pedagogical judgements. Change them
+  deliberately, and update the tests that state them.
+
+## Verification
+
+```bash
+npm run verify
+```
+
+Type checking, lint, 69 tests and a production build. All green as of this
+commit.

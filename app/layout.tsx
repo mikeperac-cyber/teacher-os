@@ -11,7 +11,6 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: "Teacher OS",
   description: "Separate ESL and IELTS Academic workspaces for private teachers, with purpose-built dashboards, tracking and lesson workflows.",
-  other: { "codex-preview": "development" },
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
 };
 

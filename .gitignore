@@ -4,11 +4,6 @@
 /node_modules
 /.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
 # testing
 /coverage
@@ -16,6 +11,7 @@
 # next.js
 /.next/
 /out/
+/build/
 
 # misc
 .DS_Store
@@ -37,8 +33,10 @@ yarn-error.log*
 # typescript
 next-env.d.ts
 *.tsbuildinfo
-/dist/
-/.wrangler/
+
+# leftovers from the retired ChatGPT Sites toolchain (safe to delete)
 /.sites-runtime/
-/outputs/
-/work/
+/.wrangler/
+
+# local browser-automation scratch output
+/.playwright-mcp/

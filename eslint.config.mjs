@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local tooling scratch directories, not project source.
+    ".remember/**",
+    ".sites-runtime/**",
+    ".playwright-mcp/**",
   ]),
 ]);
 

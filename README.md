@@ -1,72 +1,76 @@
 # Teacher OS
 
-Claude-ready source export of the existing Teacher OS interface.
+A productivity application for a private 1:1 ESL and IELTS Academic teacher.
 
-Export date: 10 August 2026  
-Source version: Teacher OS version 4  
-Visual reference: https://teacher-os.mike487612.chatgpt.site
+Originally a ChatGPT Sites export of Teacher OS version 4 (10 August 2026).
+Visual reference: https://teacher-os.mike487612.chatgpt.site — kept as a
+reference only. Do not reconnect this repository to that deployment.
 
-The live ChatGPT Sites deployment was not modified during this export. This
-package is an independent copy and contains no live-site identifier,
-credentials, dependency folder, build output, or Git history.
+## Current state
 
-## Current product state
-
-- Desktop-first productivity interface for a private 1:1 ESL and IELTS
-  Academic teacher.
-- Separate ESL and IELTS navigation, dashboards, progress views, assessments,
-  homework and lesson-planning experiences.
+- Desktop-first interface with **separate ESL and IELTS workspaces** —
+  different dashboards, navigation, progress models, assessments and reports.
+  This separation is a product rule, not a styling choice; see `CLAUDE.md`.
 - Shared Calendar, Tasks, Goals, Projects, Reports and Materials areas.
-- URL-aware navigation and working interface controls.
-- Demonstration data is hard-coded in `app/page.tsx`.
-- Changes made through the interface are React state only and reset after a
-  refresh.
-- `db/schema.ts` is intentionally empty. There is no production database or
-  application-owned authentication yet.
+- URL-aware navigation: `?track=esl|ielts&view=<area>&detail=<slug>`.
+- The dashboard is a triage surface — next lesson, what is blocking it, a
+  merged action queue and at-risk learners.
+- **No database and no authentication yet.** Every collection resolves through
+  `lib/fixtures/`, which currently returns empty, so every screen renders its
+  empty state. That is the correct state for a workspace with no records.
 
-Read [CLAUDE.md](CLAUDE.md) and the files in [docs](docs) before making changes.
+Read [CLAUDE.md](CLAUDE.md), [docs/adr/0001-production-runtime-and-database.md](docs/adr/0001-production-runtime-and-database.md)
+and the rest of [docs](docs) before making changes.
 
-## Technology in this export
+## Technology
 
-- Next.js 16 App Router
-- React 19 and TypeScript
-- Vinext/Vite targeting a Cloudflare Worker
-- Tailwind PostCSS tooling and custom CSS
-- Drizzle ORM scaffold for optional Cloudflare D1
+- Next.js 16 App Router, React 19, TypeScript
+- Tailwind PostCSS tooling plus the hand-written visual system in
+  `app/globals.css`
 - Lucide React icons
+- Vitest for tests
+- Target deployment: Vercel, with Supabase for Postgres, Auth and Storage
+  (ADR 0001)
 
-The application UI is concentrated in:
+## Layout
 
-- `app/page.tsx` — product data, views and interactions
-- `app/globals.css` — full visual system
-- `app/layout.tsx` — metadata and fonts
+| Path | Contents |
+| --- | --- |
+| `app/` | Route, layout and the two stylesheets |
+| `components/dashboard/` | Triage panels — next-up lesson, action inbox, at-risk, capacity, goals, quick actions |
+| `lib/dashboard/` | The triage rules. Pure functions taking `now` explicitly, so thresholds are reviewable and testable |
+| `lib/types/` | `domain.ts` is the field-level contract the Supabase schema is derived from |
+| `lib/fixtures/` | The data seam. Empty today; replaced by queries one module at a time |
+| `lib/actions/` | Write path. Has the shape a server action will take |
+| `tests/` | Vitest suites over the rules and the create flow |
 
 ## Start locally
 
-Node.js 22.13 or newer is required. On Windows, use WSL 2 because the existing
-Sites build helpers use Linux shell utilities.
+Node.js 22.13 or newer. No WSL required.
 
 ```bash
-npm ci
+npm install
 npm run dev
 ```
 
-Run the current verification suite with:
+## Verify
 
 ```bash
-npm test
+npm run verify
 ```
 
-## Continue with Claude Code
+That runs type checking, lint, tests and a production build. The individual
+steps are `npm run typecheck`, `npm run lint`, `npm test` and `npm run build`.
 
-1. Extract this ZIP.
-2. Put the folder in a new private GitHub repository.
-3. Open the folder in Cursor or Claude Code.
-4. Ask Claude to read `CLAUDE.md` and `docs/CURRENT_STATE.md`.
-5. Begin with the audit prompt in `docs/FIRST_CLAUDE_PROMPT.md`.
-6. Commit the untouched export before implementing the database migration.
+## Where the demo data went
 
-Do not reconnect this copy to the existing ChatGPT Sites project. Keep the
-current deployment as a visual reference until the production replacement has
-passed authentication, permissions and data-isolation testing.
+The original export hard-coded roughly 90 sample records in `app/page.tsx`.
+They were removed on 10 August 2026, but their shapes were preserved first as
+types in `lib/types/domain.ts` — that file is now the specification the database
+schema is built from.
 
+The records themselves remain in git:
+
+```bash
+git show 294b548:app/page.tsx
+```

@@ -1,30 +1,48 @@
 # Visual record
 
-Captured with Playwright at a 1440×900 viewport against the Vinext dev server.
+Captured with Playwright at a 1440×900 viewport.
 
-| File | What it shows |
-| --- | --- |
-| `baseline-vinext-esl-dashboard-ARIAL-FALLBACK.png` | The ESL dashboard **with the original demo data**, before the erasure. |
-| `after-erase-esl-dashboard.png` | The same screen after the demo data was removed. Layout, spacing, theming and component structure are unchanged; every panel renders its empty state. |
-| `after-erase-ielts-writing.png` | The IELTS Writing Tracker, confirming the two tracks remain visually and structurally distinct (violet vs. ESL mint) and that the four official Writing criteria survive as product copy. |
+## The regression baseline
 
-## These are not yet the regression baseline
+**`nextjs-esl-dashboard-GEIST.png` and `nextjs-ielts-dashboard-GEIST.png` are
+the baseline.** They are the first screenshots of this application rendering
+with its intended typography, taken after the Phase 1a toolchain swap.
 
-The filename says `ARIAL-FALLBACK` for a reason. The exported
-`.vinext/fonts/*/style.css` hard-codes the ChatGPT Sites build machine's
-absolute path:
+Compare future changes against these.
+
+## Why the earlier shots are not the baseline
+
+`baseline-vinext-esl-dashboard-ARIAL-FALLBACK.png` shows the app under the
+original Vinext/Cloudflare toolchain. The exported `.vinext/fonts/*/style.css`
+hard-coded the ChatGPT Sites build machine's absolute path:
 
 ```
 src: url(/workspace/scratch/dc4358463e51/sites/teacher-os/.vinext/fonts/geist-ff2310f5.woff2)
 ```
 
-Geist therefore 404s locally (11 console errors on every page load) and the app
-falls back to Arial. **These screenshots do not show the intended typography.**
+Geist therefore 404'd on every load — 11 console errors per page — and the app
+silently fell back to Arial. Any baseline captured then would have permanently
+baked the wrong font into every future comparison.
 
-Switching to `next/font/google` in Phase 1a repairs this by self-hosting Geist
-from a correct relative path. The real pixel-diff baseline must be captured
-*after* that swap — capturing it now would permanently bake the wrong font into
-the comparison.
+Moving to `next/font/google` repaired it: Geist is now self-hosted and served
+from a correct relative path, and the console is clean.
 
-Until then these images serve a narrower purpose: showing that removing the demo
-data changed the content and nothing else.
+## Contents
+
+| File | What it shows |
+| --- | --- |
+| `nextjs-esl-dashboard-GEIST.png` | **Baseline.** ESL dashboard on Next.js with Geist loaded. |
+| `nextjs-ielts-dashboard-GEIST.png` | **Baseline.** IELTS dashboard, confirming the two workspaces stay visually distinct — violet against ESL mint. |
+| `triage-esl-dashboard.png` | The triage rebuild, before the toolchain swap (Arial). |
+| `triage-ielts-dashboard.png` | Same, IELTS track. |
+| `triage-create-modal-honest-failure.png` | The create modal reporting that nothing was stored, rather than claiming success. |
+| `after-erase-esl-dashboard.png` | Immediately after the demo data was removed, before the dashboard became triage. |
+| `after-erase-ielts-writing.png` | IELTS Writing Tracker at that same point. |
+| `baseline-vinext-esl-dashboard-ARIAL-FALLBACK.png` | The original export, demo data present, wrong font. Historical reference only. |
+
+## Extending the baseline
+
+Only the two dashboards are captured. There are 31 reachable states in total
+(15 areas in ESL, 16 in IELTS). Capturing the rest is a scripted job — add
+Playwright as a dev dependency and iterate over `?track=…&view=…` — and is worth
+doing before any large refactor of the area components.
