@@ -1,22 +1,26 @@
 "use client";
 
 /**
- * Feature 5 — wired quick actions.
+ * The quick-action row and its modal.
  *
- * Add Student, Plan Lesson, Assign Homework and Record Assessment previously
- * did nothing. Each now opens a real modal with real validation, wired to
- * `lib/actions/create-record.ts`.
+ * "Add learner" performs a real write through `createStudent`, a server action
+ * that goes through Row Level Security like every other write.
  *
- * Persistence is still missing, and the modal says so plainly instead of
- * reporting success. Every other part is finished: the fields, the validation,
- * the submitting state, the error surface and the labels that change per track.
- * When Supabase lands, only the body of `createRecord` changes.
+ * The other three actions do not have a form yet, because they genuinely need
+ * more than two fields: scheduling needs a student and a time, assigning
+ * homework needs a student and a due date, recording an assessment needs a
+ * student and a set of criteria. Rather than show a form that cannot succeed,
+ * the modal says what is missing and points at where the work will live. The
+ * previous version reported "created successfully" for a write that never
+ * happened; an honest gap is better than a convincing lie.
  */
 
 import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
+  ArrowRight,
   BookOpen,
+  CheckCircle2,
   ClipboardCheck,
   FileCheck2,
   Loader2,
@@ -26,12 +30,13 @@ import {
 } from "lucide-react";
 import type { ElementType } from "react";
 
+import { createStudent } from "@/lib/actions/workflow";
 import {
   SUBJECT_LABELS,
-  createRecord,
   validateDraft,
+  type FieldErrors,
+  type RecordKind,
 } from "@/lib/actions/create-record";
-import type { FieldErrors, RecordKind } from "@/lib/actions/create-record";
 import type { Track } from "@/lib/types/ui";
 
 type QuickAction = {
@@ -55,10 +60,7 @@ const ACTIONS: QuickAction[] = [
     kind: "lesson",
     icon: BookOpen,
     label: { ESL: "Plan lesson", IELTS: "Plan lesson" },
-    hint: {
-      ESL: "Plan from a CEFR outcome",
-      IELTS: "Plan from a target band",
-    },
+    hint: { ESL: "Plan from a CEFR outcome", IELTS: "Plan from a target band" },
   },
   {
     kind: "homework",
@@ -80,7 +82,13 @@ const ACTIONS: QuickAction[] = [
   },
 ];
 
-export function QuickActions({ track }: { track: Track }) {
+export function QuickActions({
+  track,
+  workspaceId,
+}: {
+  track: Track;
+  workspaceId: string | null;
+}) {
   const [openKind, setOpenKind] = useState<RecordKind | null>(null);
 
   return (
@@ -106,19 +114,13 @@ export function QuickActions({ track }: { track: Track }) {
         <CreateRecordModal
           kind={openKind}
           track={track}
+          workspaceId={workspaceId}
           close={() => setOpenKind(null)}
         />
       )}
     </>
   );
 }
-
-const TITLE_LABELS: Record<RecordKind, string> = {
-  student: "Student name",
-  lesson: "Lesson title",
-  homework: "Assignment title",
-  assessment: "Assessment title",
-};
 
 const HEADINGS: Record<RecordKind, Record<Track, string>> = {
   student: { ESL: "New ESL learner", IELTS: "New IELTS candidate" },
@@ -127,26 +129,42 @@ const HEADINGS: Record<RecordKind, Record<Track, string>> = {
   assessment: { ESL: "Record a progress check", IELTS: "Record a mock result" },
 };
 
-/**
- * Exported so the topbar's Quick add menu opens the same modal.
- *
- * Two entry points, one write path — otherwise "Add student" would mean
- * something different depending on which button the teacher reached for.
- */
+/** What each unbuilt screen still needs, stated plainly. */
+const NOT_BUILT: Record<
+  Exclude<RecordKind, "student">,
+  { needs: string; lives: string }
+> = {
+  lesson: {
+    needs: "a student to teach and a time to teach them",
+    lives: "the Lesson Planner",
+  },
+  homework: {
+    needs: "a student, a task and a due date",
+    lives: "the Homework board",
+  },
+  assessment: {
+    needs: "a student and a set of criteria to score against",
+    lives: "Assessments",
+  },
+};
+
 export function CreateRecordModal({
   kind,
   track,
+  workspaceId,
   close,
 }: {
   kind: RecordKind;
   track: Track;
+  workspaceId: string | null;
   close: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
-  const [note, setNote] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [status, setStatus] = useState<"idle" | "saving" | "failed">("idle");
+  const [status, setStatus] = useState<"idle" | "saving" | "failed" | "saved">(
+    "idle",
+  );
   const [message, setMessage] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -161,8 +179,8 @@ export function CreateRecordModal({
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    const draft = { kind, track, title, subject, note };
 
+    const draft = { kind, track, title, subject };
     const fieldErrors = validateDraft(draft);
     setErrors(fieldErrors);
     if (Object.keys(fieldErrors).length) {
@@ -171,17 +189,38 @@ export function CreateRecordModal({
       return;
     }
 
+    if (!workspaceId) {
+      setStatus("failed");
+      setMessage(
+        "You are not signed in to a workspace, so there is nowhere to save this.",
+      );
+      return;
+    }
+
     setStatus("saving");
     setMessage(null);
-    const result = await createRecord(draft);
+
+    const result = await createStudent({
+      workspaceId,
+      track,
+      fullName: title,
+      target: subject,
+    });
 
     if (result.ok) {
+      setStatus("saved");
+      setMessage(null);
+      // The server action revalidates, so closing reveals the new learner.
       close();
       return;
     }
+
     setStatus("failed");
-    setMessage(result.message);
+    setMessage(result.error);
+    if (result.field === "target") setErrors({ subject: result.error });
   };
+
+  const heading = HEADINGS[kind][track];
 
   return (
     <div className="modal-backdrop" onMouseDown={close}>
@@ -189,87 +228,99 @@ export function CreateRecordModal({
         className="create-modal"
         role="dialog"
         aria-modal="true"
-        aria-label={HEADINGS[kind][track]}
+        aria-label={heading}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="create-modal-head">
           <div>
             <span className="eyebrow">{track} workspace</span>
-            <h2>{HEADINGS[kind][track]}</h2>
+            <h2>{heading}</h2>
           </div>
           <button className="icon-button" onClick={close} aria-label="Close">
             <X size={18} />
           </button>
         </header>
 
-        <form className="create-modal-body" onSubmit={submit} noValidate>
-          <label className={errors.title ? "has-error" : ""}>
-            <span>{TITLE_LABELS[kind]}</span>
-            <input
-              ref={titleRef}
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder={
-                kind === "student" ? "Full name" : "Something you will recognise later"
-              }
-              aria-invalid={Boolean(errors.title)}
-            />
-            {errors.title && <small role="alert">{errors.title}</small>}
-          </label>
+        {kind === "student" ? (
+          <form className="create-modal-body" onSubmit={submit} noValidate>
+            <label className={errors.title ? "has-error" : ""}>
+              <span>{track === "ESL" ? "Learner name" : "Candidate name"}</span>
+              <input
+                ref={titleRef}
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Full name"
+                aria-invalid={Boolean(errors.title)}
+              />
+              {errors.title && <small role="alert">{errors.title}</small>}
+            </label>
 
-          <label className={errors.subject ? "has-error" : ""}>
-            <span>{SUBJECT_LABELS[kind][track]}</span>
-            <input
-              value={subject}
-              onChange={(event) => setSubject(event.target.value)}
-              placeholder={
-                track === "ESL" ? "A2 → B1 · confident speaking" : "6.0 → 7.0 · Writing"
-              }
-              aria-invalid={Boolean(errors.subject)}
-            />
-            {errors.subject && <small role="alert">{errors.subject}</small>}
-          </label>
+            <label className={errors.subject ? "has-error" : ""}>
+              <span>{SUBJECT_LABELS[kind][track]}</span>
+              <input
+                value={subject}
+                onChange={(event) => setSubject(event.target.value)}
+                placeholder={track === "ESL" ? "B1" : "7.0"}
+                aria-invalid={Boolean(errors.subject)}
+              />
+              {errors.subject && <small role="alert">{errors.subject}</small>}
+            </label>
 
-          <label>
-            <span>Next action (optional)</span>
-            <textarea
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder="What should happen next?"
-            />
-          </label>
+            {status === "failed" && message && (
+              <p className="create-modal-error" role="alert">
+                <AlertCircle size={15} />
+                <span>{message}</span>
+              </p>
+            )}
 
-          {/* Honest failure. The previous drawer reported "created successfully"
-              for a write that never happened; a teacher would have lost the
-              record and only discovered it after a refresh. */}
-          {status === "failed" && message && (
-            <p className="create-modal-error" role="alert">
+            {status === "saved" && (
+              <p className="create-modal-notice" role="status">
+                <CheckCircle2 size={15} />
+                <span>Saved.</span>
+              </p>
+            )}
+
+            <div className="create-modal-actions">
+              <button type="button" className="secondary-button" onClick={close}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={status === "saving"}
+              >
+                {status === "saving" ? (
+                  <>
+                    <Loader2 size={15} className="spin" /> Saving…
+                  </>
+                ) : (
+                  <>
+                    <Plus size={15} /> Create
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="create-modal-body">
+            <p className="create-modal-pending" role="status">
               <AlertCircle size={15} />
-              <span>{message}</span>
+              <span>
+                This screen is not built yet. {heading} needs{" "}
+                {NOT_BUILT[kind].needs}, which is more than this form can ask
+                for — it will live in {NOT_BUILT[kind].lives}.
+              </span>
             </p>
-          )}
-
-          <div className="create-modal-actions">
-            <button type="button" className="secondary-button" onClick={close}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="primary-button"
-              disabled={status === "saving"}
-            >
-              {status === "saving" ? (
-                <>
-                  <Loader2 size={15} className="spin" /> Saving…
-                </>
-              ) : (
-                <>
-                  <Plus size={15} /> Create
-                </>
-              )}
-            </button>
+            <div className="create-modal-actions">
+              <button type="button" className="secondary-button" onClick={close}>
+                Close
+              </button>
+              <button type="button" className="primary-button" onClick={close}>
+                Understood <ArrowRight size={15} />
+              </button>
+            </div>
           </div>
-        </form>
+        )}
       </div>
     </div>
   );

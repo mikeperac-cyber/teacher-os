@@ -121,10 +121,13 @@ const percent = (value: number | null) =>
 
 export function Workspace({
   shellUser,
+  workspaceId,
   triage,
   nowIso,
 }: {
   shellUser: ShellUser;
+  /** Null until the user is signed in with a workspace. Writes need it. */
+  workspaceId: string | null;
   /** Fetched on the server for this request; see app/page.tsx. */
   triage: TriageData;
   /** The server's clock, so relative times match between render and hydration. */
@@ -447,6 +450,7 @@ export function Workspace({
           {activeArea === "Dashboard" ? (
             activeTrack === "ESL" ? (
               <ESLDashboard
+                workspaceId={workspaceId}
                 triage={triage}
                 nowIso={nowIso}
                 navigate={navigate}
@@ -455,6 +459,7 @@ export function Workspace({
               />
             ) : (
               <IELTSDashboard
+                workspaceId={workspaceId}
                 triage={triage}
                 nowIso={nowIso}
                 navigate={navigate}
@@ -521,6 +526,7 @@ export function Workspace({
         <CreateRecordModal
           kind={quickCreate}
           track={activeTrack}
+          workspaceId={workspaceId}
           close={() => setQuickCreate(null)}
         />
       )}

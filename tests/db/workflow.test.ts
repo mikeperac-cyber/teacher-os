@@ -113,6 +113,108 @@ describe("insert ... returning", () => {
   });
 });
 
+/**
+ * `create_student` writes the learner and their track profile in one
+ * transaction. Two client calls cannot share one, and a learner with no profile
+ * is a broken record that nothing surfaces.
+ */
+describe("create_student", () => {
+  it("creates an IELTS candidate and their profile together", async () => {
+    const rows = (await writeAs(
+      db,
+      ids.owner,
+      `select public.create_student($1, 'ielts', 'Atomic Candidate', '7.0', current_date + 40) as id`,
+      [ids.workspace],
+    )) as { id: string }[];
+
+    const created = rows[0].id;
+    expect(created).toBeTruthy();
+
+    const profile = await queryAs(
+      db,
+      ids.owner,
+      `select target_band, test_date from public.ielts_student_profiles where student_id = $1`,
+      [created],
+    );
+    expect(profile).toHaveLength(1);
+  });
+
+  it("creates an ESL learner with a CEFR profile instead", async () => {
+    const rows = (await writeAs(
+      db,
+      ids.owner,
+      `select public.create_student($1, 'esl', 'Atomic Learner', 'B2') as id`,
+      [ids.workspace],
+    )) as { id: string }[];
+
+    const esl = await queryAs(
+      db,
+      ids.owner,
+      `select target_cefr from public.esl_student_profiles where student_id = $1`,
+      [rows[0].id],
+    );
+    expect(esl).toHaveLength(1);
+
+    // The IELTS profile table must stay untouched for an ESL learner.
+    const ielts = await queryAs(
+      db,
+      ids.owner,
+      `select id from public.ielts_student_profiles where student_id = $1`,
+      [rows[0].id],
+    );
+    expect(ielts).toEqual([]);
+  });
+
+  /** The whole reason this is a function: no half-created learner. */
+  it("leaves no student behind when the profile is invalid", async () => {
+    const before = (await queryAs(
+      db,
+      ids.owner,
+      `select count(*)::int as n from public.students`,
+    )) as { n: number }[];
+
+    await expect(
+      writeAs(
+        db,
+        ids.owner,
+        `select public.create_student($1, 'ielts', 'Rolled Back', '6.3') as id`,
+        [ids.workspace],
+      ),
+    ).rejects.toThrow();
+
+    const after = (await queryAs(
+      db,
+      ids.owner,
+      `select count(*)::int as n from public.students`,
+    )) as { n: number }[];
+
+    expect(after[0].n).toBe(before[0].n);
+  });
+
+  it("refuses a blank name", async () => {
+    await expect(
+      writeAs(
+        db,
+        ids.owner,
+        `select public.create_student($1, 'esl', '   ') as id`,
+        [ids.workspace],
+      ),
+    ).rejects.toThrow();
+  });
+
+  /** SECURITY INVOKER, so RLS still applies inside the function. */
+  it("refuses a teacher, because it runs with the caller's privileges", async () => {
+    await expect(
+      writeAs(
+        db,
+        ids.teacher,
+        `select public.create_student($1, 'esl', 'Teacher Attempt') as id`,
+        [ids.workspace],
+      ),
+    ).rejects.toThrow();
+  });
+});
+
 describe("step 1 — the owner creates a student", () => {
   it("creates the learner and their track profile", async () => {
     const rows = (await writeAs(

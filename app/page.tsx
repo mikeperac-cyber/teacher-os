@@ -70,6 +70,7 @@ export default async function WorkspacePage() {
   return (
     <Workspace
       shellUser={shellUserFrom(session)}
+      workspaceId={session.status === "active" ? session.workspaceId : null}
       triage={triage}
       nowIso={now.toISOString()}
     />

@@ -13,6 +13,7 @@ import "server-only";
  * data.
  */
 
+import { firstOf } from "@/lib/queries/mappers";
 import { createClient } from "@/lib/supabase/server";
 import { initialsFrom } from "@/lib/types/auth";
 import type { WorkspaceRole, WorkspaceSession } from "@/lib/types/auth";
@@ -65,9 +66,10 @@ export async function getSession(): Promise<WorkspaceSession> {
     };
   }
 
-  const workspace = membership.workspaces as unknown as
-    | { name: string }
-    | null;
+  // `firstOf` rather than a cast: PostgREST returns an embed as an object or an
+  // array depending on whether it can infer a one-to-one relationship, and
+  // guessing wrong here silently renamed every workspace to "Workspace".
+  const workspace = firstOf<{ name: string }>(membership.workspaces);
 
   return {
     status: "active",

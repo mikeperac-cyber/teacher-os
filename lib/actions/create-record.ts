@@ -1,24 +1,13 @@
 /**
  * Feature 5 — the write path behind the quick actions.
  *
- * Add Student, Plan Lesson, Assign Homework and Record Assessment previously
- * did nothing: the buttons opened a drawer that reported "created successfully"
- * for a write that never happened.
+ * Pure functions only — no writes. Creating a student now goes through
+ * `createStudent` in `./workflow.ts`, a real server action subject to Row Level
+ * Security. This module keeps the client-side validation, which runs before the
+ * round trip so a missing field is reported instantly.
  *
- * They are now wired to real forms with real validation. What is still missing
- * is persistence, and this module is where that gap is made explicit rather
- * than hidden.
- *
- * THE SHAPE IS THE POINT
- * ----------------------
- * `createRecord` has the signature a Next.js server action will have in
- * Phase 3: it takes a typed draft and returns a discriminated result. When
- * Supabase is connected, only the body of this function changes — the forms,
- * their validation and their error states stay exactly as they are.
- *
- * Until then it returns a failure. That is deliberate: a form that silently
- * pretends to save is worse than one that says it cannot, because the teacher
- * loses work and only finds out later.
+ * Client-side validation is a convenience and never a control: the same rules
+ * are enforced again by the action and by database constraints.
  */
 
 import type { Track } from "@/lib/types/ui";
@@ -34,9 +23,6 @@ export type RecordDraft = {
   note?: string;
 };
 
-export type CreateResult =
-  | { ok: true; id: string }
-  | { ok: false; reason: "not-connected" | "invalid"; message: string };
 
 /** Field-level validation errors, keyed by field name. */
 export type FieldErrors = Partial<Record<"title" | "subject", string>>;
@@ -85,28 +71,4 @@ export function validateDraft(draft: RecordDraft): FieldErrors {
     errors.subject = `Required — ${SUBJECT_LABELS[draft.kind][draft.track].toLowerCase()}.`;
   }
   return errors;
-}
-
-/**
- * Persists a record.
- *
- * Phase 3 replaces the body with an authorized Supabase insert. Authorization
- * is enforced by Row Level Security in Postgres, so this function does not — and
- * must not — decide who may write what.
- */
-export async function createRecord(draft: RecordDraft): Promise<CreateResult> {
-  const errors = validateDraft(draft);
-  if (Object.keys(errors).length) {
-    return {
-      ok: false,
-      reason: "invalid",
-      message: "Check the highlighted fields.",
-    };
-  }
-
-  return {
-    ok: false,
-    reason: "not-connected",
-    message: `No database is connected yet, so this ${KIND_LABELS[draft.kind]} cannot be saved. Nothing has been stored.`,
-  };
 }

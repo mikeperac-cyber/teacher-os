@@ -1,7 +1,10 @@
-import "server-only";
-
 /**
  * Helpers shared by the query modules.
+ *
+ * Deliberately *not* `server-only`. Everything here is a pure function with no
+ * access to a request, a cookie or a database, and marking it server-only made
+ * it unimportable by the tests that cover the mapping layer — which is exactly
+ * the layer that turned out to be wrong.
  *
  * The queries here return the *same types the fixtures returned*. That is the
  * whole design: `lib/fixtures/` established the shape, the components were

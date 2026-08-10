@@ -82,51 +82,43 @@ export async function createStudent(input: {
     return { ok: false, error: "Give the learner a name.", field: "fullName" };
   }
 
-  const context = await client();
-  if (!context) return { ok: false, error: NOT_CONNECTED };
-  const { supabase } = context;
-
-  const { data: student, error } = await supabase
-    .from("students")
-    .insert({
-      workspace_id: input.workspaceId,
-      track: toTrackValue(input.track),
-      full_name: input.fullName.trim(),
-    })
-    .select("id")
-    .single();
-
-  if (error) return { ok: false, error: describeError(error) };
-
-  // The track-specific profile is created alongside, so a learner is never
-  // half-registered. ESL and IELTS keep separate profile tables by design.
-  const studentId = student.id as string;
-
-  if (input.track === "ESL") {
-    await supabase.from("esl_student_profiles").insert({
-      workspace_id: input.workspaceId,
-      student_id: studentId,
-      target_cefr: input.target || null,
-    });
-  } else {
-    const targetBand = input.target ? Number(input.target) : null;
-    if (targetBand !== null && (Number.isNaN(targetBand) || targetBand < 0 || targetBand > 9)) {
+  // Validated before the round trip so the message names the field, but the
+  // database enforces the same range through the band_score domain.
+  if (input.track === "IELTS" && input.target) {
+    const targetBand = Number(input.target);
+    if (
+      Number.isNaN(targetBand) ||
+      targetBand < 0 ||
+      targetBand > 9 ||
+      (targetBand * 2) % 1 !== 0
+    ) {
       return {
         ok: false,
-        error: "Target band must be between 0 and 9.",
+        error: "Target band must be between 0 and 9, in half-band steps.",
         field: "target",
       };
     }
-    await supabase.from("ielts_student_profiles").insert({
-      workspace_id: input.workspaceId,
-      student_id: studentId,
-      target_band: targetBand,
-      test_date: input.testDate || null,
-    });
   }
 
+  const context = await client();
+  if (!context) return { ok: false, error: NOT_CONNECTED };
+
+  // A single call, because the learner and their track profile must land
+  // together or not at all. See supabase/migrations/0010_create_student.sql —
+  // two client calls cannot share a transaction, and a learner with no profile
+  // is a broken record nothing surfaces.
+  const { data, error } = await context.supabase.rpc("create_student", {
+    p_workspace_id: input.workspaceId,
+    p_track: toTrackValue(input.track),
+    p_full_name: input.fullName.trim(),
+    p_target: input.target ?? null,
+    p_test_date: input.testDate || null,
+  });
+
+  if (error) return { ok: false, error: describeError(error) };
+
   revalidatePath("/");
-  return { ok: true, data: { studentId } };
+  return { ok: true, data: { studentId: data as string } };
 }
 
 /* ------------------------------------------------------------------ */
@@ -371,11 +363,22 @@ export async function recordFeedback(input: {
   if (error) return { ok: false, error: describeError(error) };
 
   // Returning the work closes the loop the homework board shows.
+  //
+  // Reported rather than ignored: if this fails, the learner can see their
+  // feedback while the board still shows the work as outstanding, and the
+  // teacher would keep marking something already marked.
   if (input.release) {
-    await supabase
+    const { error: returnError } = await supabase
       .from("homework_submissions")
       .update({ status: "returned" })
       .eq("id", input.submissionId);
+
+    if (returnError) {
+      return {
+        ok: false,
+        error: `Feedback was saved and released, but the homework could not be marked returned: ${describeError(returnError)}`,
+      };
+    }
   }
 
   revalidatePath("/");
