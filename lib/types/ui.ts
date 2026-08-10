@@ -99,14 +99,3 @@ export type DestinationPanel = {
 /** Surfaces a transient confirmation message. */
 export type Announce = (message: string, openPanel?: boolean) => void;
 
-/**
- * The signed-in teacher.
- *
- * Populated from Supabase Auth in Phase 2. `null` means "not signed in", which
- * is the only correct value until authentication exists.
- */
-export type CurrentUser = {
-  displayName: string;
-  initials: string;
-  role: string;
-};

@@ -1,6 +1,6 @@
 # Current state
 
-Last updated 10 August 2026, after Phase 1a.
+Last updated 10 August 2026, after Phase 2b.
 
 For the original export's state, see `git show 294b548` and the version of this
 file at that commit.
@@ -15,13 +15,20 @@ file at that commit.
   see `adr/0001-production-runtime-and-database.md`.
 
 ```
-app/            route, layout, globals.css (untouched from the export), dashboard.css
-components/     primitives + dashboard triage panels
-lib/dashboard/  triage rules — pure functions, every one takes `now` explicitly
-lib/types/      domain.ts is the contract the Supabase schema derives from
-lib/fixtures/   the data seam; empty, replaced by queries one module at a time
-lib/actions/    write path, shaped like the server action it will become
-tests/          Vitest — 69 tests
+app/                route, auth screens, layout, three stylesheets
+  page.tsx          server component — resolves the session, renders the shell
+  (auth)/           sign-in and sign-up (route group; URLs are /sign-in, /sign-up)
+  auth/callback/    exchanges the email-confirmation code for a session
+proxy.ts            session refresh + redirect for signed-out requests
+components/         primitives, dashboard triage panels, auth form, workspace shell
+lib/supabase/       browser / server / admin clients, and `isSupabaseConfigured`
+lib/auth/           session resolution and the sign-in/up/out server actions
+lib/dashboard/      triage rules — pure functions, every one takes `now` explicitly
+lib/types/          domain.ts is the contract the Supabase schema derives from
+lib/fixtures/       the data seam; empty, replaced by queries one module at a time
+lib/actions/        write path, shaped like the server action it will become
+supabase/migrations/ 9 migrations, 27 tables, RLS on every one
+tests/              Vitest — 108 tests, including 28 against a real Postgres
 ```
 
 ## What works
@@ -37,15 +44,28 @@ tests/          Vitest — 69 tests
 - Per-area filtering and sorting within a session.
 - Every screen has a designed empty state.
 
+- Sign in, sign up, sign out, and email confirmation, in the existing visual
+  language.
+- A session resolved on the server and passed into the shell as a prop, so the
+  browser is never asked who the user is.
+
 ## What is not built yet
 
-- **No database.** Every collection in `lib/fixtures/` returns empty, so every
-  screen renders its empty state. That is correct for a workspace with no
-  records, not a defect.
-- **No authentication.** The sidebar reads "Not signed in". Roles, Row Level
-  Security and the owner/teacher/student boundary are Phase 2.
+- **No Supabase project provisioned.** The schema, policies and client wiring
+  all exist and are tested, but nobody has created the project yet — that needs
+  Mike's account. See `SUPABASE_SETUP.md`.
+
+  Until then the app runs in a deliberate "unconfigured" state: it starts, every
+  screen renders, and the sidebar says *Not connected* rather than pretending
+  someone is signed in. `isSupabaseConfigured` is checked before any client is
+  built, so nothing throws.
+- **No data.** Every collection in `lib/fixtures/` returns empty, so every
+  screen renders its empty state. Correct for a workspace with no records.
 - **No persistence.** `createRecord` validates and then refuses, reporting that
   nothing was stored. It must keep refusing until a database is behind it.
+- **No student shell.** Role reaches the interface, but a student currently sees
+  the same layout as a teacher. They would read nothing they should not — RLS
+  refuses it in Postgres — but the screens are not yet built for them.
 - No file upload or download; no email or calendar integration.
 - Reports and several area screens are structure without data.
 

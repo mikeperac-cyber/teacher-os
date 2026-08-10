@@ -4,18 +4,17 @@
  */
 
 import type { SearchResult } from "@/lib/types/domain";
-import type { CurrentUser, Track } from "@/lib/types/ui";
+import type { Track } from "@/lib/types/ui";
 
-/**
- * The signed-in teacher.
+/*
+ * NOTE: the signed-in user is no longer a fixture.
  *
- * `null` is correct and deliberate: there is no authentication yet, so there is
- * no user. It previously read "Mike Teacher / Private tutor", hard-coded into
- * the sidebar. Identity comes from Supabase Auth in Phase 2 — never from a
- * constant, and never from a request header (see ADR 0001 on
- * `app/chatgpt-auth.ts`).
+ * It briefly lived here as `currentUser = null`, replacing the hard-coded
+ * "Mike Teacher / Private tutor" from the original export. It is now resolved
+ * server-side by `lib/auth/session.ts` from Supabase Auth and passed into the
+ * shell as a prop — never from a constant, and never from a request header
+ * (see ADR 0001 on the deleted `app/chatgpt-auth.ts`).
  */
-export const currentUser: CurrentUser | null = null;
 
 /**
  * Global-search results.
