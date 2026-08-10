@@ -18,10 +18,21 @@ import Link from "next/link";
 
 import { Workspace } from "@/components/workspace/Workspace";
 import { getSession } from "@/lib/auth/session";
+import { getTriageData } from "@/lib/queries/triage";
 import { shellUserFrom } from "@/lib/types/auth";
 
 export default async function WorkspacePage() {
   const session = await getSession();
+
+  /**
+   * One clock for the whole render.
+   *
+   * Captured here and passed down as an ISO string so every relative label —
+   * "in 48 min", "overdue by 2 days" — is computed from the same instant on the
+   * server and again on hydration. A client-side clock produced a hydration
+   * mismatch, which is what the old `useNow` hook existed to work around.
+   */
+  const now = new Date();
 
   // Signed in, but belonging to no workspace. Every policy is scoped by
   // membership, so this user would see an entirely empty application with no
@@ -51,5 +62,16 @@ export default async function WorkspacePage() {
     );
   }
 
-  return <Workspace shellUser={shellUserFrom(session)} />;
+  // Fetched with the user-scoped client, so Row Level Security decides what is
+  // in here. An unconfigured or signed-out request gets empty collections and
+  // the same empty states the fixtures produced.
+  const triage = await getTriageData(now);
+
+  return (
+    <Workspace
+      shellUser={shellUserFrom(session)}
+      triage={triage}
+      nowIso={now.toISOString()}
+    />
+  );
 }

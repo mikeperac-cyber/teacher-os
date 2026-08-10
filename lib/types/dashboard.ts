@@ -240,3 +240,25 @@ export type DashboardStat = {
   /** True when the underlying figure needs records that do not exist yet. */
   pending: boolean;
 };
+
+/* ------------------------------------------------------------------ */
+/* Fetched triage data                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Everything the dashboard renders, for one request.
+ *
+ * Declared here rather than beside the query that produces it, because client
+ * components import this type and `lib/queries/triage.ts` is `server-only`.
+ * Keeping the type here means there is no path, even a type-only one, from a
+ * client component into server code.
+ */
+export type TriageData = {
+  upcomingLessons: import("./domain").UpcomingLesson[];
+  studentSignals: import("./domain").StudentSignal[];
+  pendingHomework: import("./domain").PendingHomework[];
+  pendingAssessments: import("./domain").PendingAssessment[];
+  scheduledTasks: import("./domain").ScheduledTask[];
+  goalReviews: import("./domain").ScheduledGoalReview[];
+  dayCapacities: import("./domain").DayCapacity[];
+};

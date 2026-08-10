@@ -1,6 +1,6 @@
 # Current state
 
-Last updated 10 August 2026, after Phase 2b.
+Last updated 10 August 2026, after Phase 3.
 
 For the original export's state, see `git show 294b548` and the version of this
 file at that commit.
@@ -25,10 +25,11 @@ lib/supabase/       browser / server / admin clients, and `isSupabaseConfigured`
 lib/auth/           session resolution and the sign-in/up/out server actions
 lib/dashboard/      triage rules — pure functions, every one takes `now` explicitly
 lib/types/          domain.ts is the contract the Supabase schema derives from
-lib/fixtures/       the data seam; empty, replaced by queries one module at a time
+lib/queries/        server-side reads; return the exact shapes the fixtures did
+lib/fixtures/       the remaining seam; being replaced by queries one module at a time
 lib/actions/        write path, shaped like the server action it will become
 supabase/migrations/ 9 migrations, 27 tables, RLS on every one
-tests/              Vitest — 108 tests, including 28 against a real Postgres
+tests/              Vitest — 137 tests, including 56 against a real Postgres
 ```
 
 ## What works
@@ -59,10 +60,14 @@ tests/              Vitest — 108 tests, including 28 against a real Postgres
   screen renders, and the sidebar says *Not connected* rather than pretending
   someone is signed in. `isSupabaseConfigured` is checked before any client is
   built, so nothing throws.
-- **No data.** Every collection in `lib/fixtures/` returns empty, so every
-  screen renders its empty state. Correct for a workspace with no records.
-- **No persistence.** `createRecord` validates and then refuses, reporting that
-  nothing was stored. It must keep refusing until a database is behind it.
+- **No data**, because there is no project to hold any. The dashboard now reads
+  through `lib/queries/triage.ts` rather than fixtures, and returns empty until
+  a project exists.
+- **The workflow actions have no dedicated UI yet.** `lib/actions/workflow.ts`
+  implements all eight steps of the vertical slice and they are proven against a
+  real Postgres in `tests/db/workflow.test.ts`, but only "create student" has a
+  form wired to it. Scheduling, preparation, submission, feedback and progress
+  entry still need screens.
 - **No student shell.** Role reaches the interface, but a student currently sees
   the same layout as a teacher. They would read nothing they should not — RLS
   refuses it in Postgres — but the screens are not yet built for them.
@@ -86,5 +91,5 @@ tests/              Vitest — 108 tests, including 28 against a real Postgres
 npm run verify
 ```
 
-Type checking, lint, 69 tests and a production build. All green as of this
+Type checking, lint, 137 tests and a production build. All green as of this
 commit.

@@ -130,10 +130,23 @@ const DEFAULT_GRANTS = `
   grant usage, select on all sequences in schema public to authenticated;
 `;
 
+/**
+ * Whether a scoped block keeps its writes.
+ *
+ * Rollback is the default because most assertions only read, and discarding
+ * keeps each test independent. The workflow suite is the exception: it walks a
+ * sequence where each step depends on the last, so it commits.
+ */
+export type ScopeOptions = { commit?: boolean };
+
 export type TestDb = {
   sql: (query: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;
   /** Runs a callback as the given user, with RLS enforced. */
-  asUser: <T>(userId: string, fn: (db: TestDb) => Promise<T>) => Promise<T>;
+  asUser: <T>(
+    userId: string,
+    fn: (db: TestDb) => Promise<T>,
+    options?: ScopeOptions,
+  ) => Promise<T>;
   /** Runs a callback with RLS bypassed, for arranging fixtures. */
   asAdmin: <T>(fn: (db: TestDb) => Promise<T>) => Promise<T>;
   close: () => Promise<void>;
@@ -181,18 +194,24 @@ export async function createTestDb(): Promise<TestDb> {
 
   const db: TestDb = {
     sql,
-    asUser: async (userId, fn) => {
+    asUser: async (userId, fn, options = {}) => {
       // `set local` scopes both the role and the identity to this transaction,
       // so a test cannot leak its identity into the next one.
       await pg.exec("begin");
+      let succeeded = false;
       try {
         await pg.query("select set_config('request.jwt.claim.sub', $1, true)", [
           userId,
         ]);
         await pg.exec("set local role authenticated");
-        return await fn(db);
+        const result = await fn(db);
+        succeeded = true;
+        return result;
       } finally {
-        await pg.exec("rollback");
+        // Only commit a block that asked for it *and* got through cleanly. A
+        // statement that raised has already aborted the transaction, so there
+        // is nothing to keep either way.
+        await pg.exec(options.commit && succeeded ? "commit" : "rollback");
       }
     },
     asAdmin: async (fn) => fn(db),
@@ -210,11 +229,31 @@ export async function queryAs(
   userId: string,
   query: string,
   params: unknown[] = [],
+  options: ScopeOptions = {},
 ): Promise<unknown[]> {
-  return db.asUser(userId, async (scoped) => {
-    const { rows } = await scoped.sql(query, params);
-    return rows;
-  });
+  return db.asUser(
+    userId,
+    async (scoped) => {
+      const { rows } = await scoped.sql(query, params);
+      return rows;
+    },
+    options,
+  );
+}
+
+/**
+ * A write run as `userId` that is kept.
+ *
+ * For sequences where each step builds on the last. Reads and denial checks
+ * should keep using `queryAs`, which discards.
+ */
+export async function writeAs(
+  db: TestDb,
+  userId: string,
+  query: string,
+  params: unknown[] = [],
+): Promise<unknown[]> {
+  return queryAs(db, userId, query, params, { commit: true });
 }
 
 /**

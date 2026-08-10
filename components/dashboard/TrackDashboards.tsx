@@ -17,6 +17,7 @@
  * The organising rule: decide and act in under 30 seconds.
  */
 
+import { useMemo } from "react";
 import { ArrowRight, CalendarDays, Sparkles } from "lucide-react";
 
 import { ActionInbox } from "./ActionInbox";
@@ -27,7 +28,6 @@ import { NextUpPanel } from "./NextUpPanel";
 import { QuickActions } from "./QuickActions";
 import { StatTiles } from "./StatTiles";
 import { WorkflowStrip } from "./WorkflowStrip";
-import { useNow } from "./use-now";
 
 import {
   buildActionInbox,
@@ -40,85 +40,78 @@ import {
   deriveWorkflowStage,
   selectNextLesson,
 } from "@/lib/dashboard";
-import { EMPTY_WEEK } from "@/lib/dashboard/capacity";
-import { NO_PREP } from "@/lib/dashboard/prep-checklist";
-import {
-  dayCapacities,
-  goalReviews,
-  pendingAssessments,
-  pendingHomework,
-  scheduledTasks,
-  studentSignals,
-  upcomingLessons,
-} from "@/lib/fixtures";
-import type { DeepLink } from "@/lib/types/dashboard";
+import type { DeepLink, TriageData } from "@/lib/types/dashboard";
 import type { Track } from "@/lib/types/ui";
 
 export type TrackDashboardProps = {
+  /**
+   * Everything the panels render, fetched on the server for this request.
+   *
+   * Previously read from `lib/fixtures/` inside this component. The shapes are
+   * identical, which is why swapping the source changed no panel.
+   */
+  triage: TriageData;
+  /**
+   * The server's clock, as an ISO string.
+   *
+   * Passed down rather than read here, so the server render and the client
+   * hydration compute identical relative times ("in 48 min", "overdue by 2
+   * days"). This replaces the `useNow` hook, which existed only to avoid the
+   * hydration mismatch a client-side clock caused.
+   */
+  nowIso: string;
   navigate: (link: DeepLink) => void;
   onStartLesson: () => void;
   announce: (message: string, openPanel?: boolean) => void;
 };
 
-/**
- * Runs every derivation for one track.
- *
- * Before mount `now` is null (see `useNow`), so the derivations are skipped and
- * every panel renders its empty state — which is also what they render when
- * there are genuinely no records.
- */
-function useTrackTriage(track: Track) {
-  const now = useNow();
+/** Runs every derivation for one track against the data the server fetched. */
+function useTrackTriage(track: Track, triage: TriageData, nowIso: string) {
+  return useMemo(() => {
+    const now = new Date(nowIso);
+    const nextLesson = selectNextLesson(triage.upcomingLessons, track, now);
 
-  if (!now) {
     return {
-      now: null,
-      nextUp: null,
-      prep: NO_PREP,
-      inbox: [],
-      atRisk: [],
-      week: EMPTY_WEEK,
-      goals: [],
-      stats: [],
-      workflowStage: null as number | null,
+      now,
+      nextUp: buildNextUp(nextLesson, now),
+      prep: buildPrepChecklist(nextLesson, now),
+      workflowStage: deriveWorkflowStage(nextLesson, now),
+      inbox: buildActionInbox(
+        {
+          homework: triage.pendingHomework,
+          assessments: triage.pendingAssessments,
+          tasks: triage.scheduledTasks,
+        },
+        track,
+        nextLesson?.id ?? null,
+        now,
+      ),
+      atRisk: buildAtRiskStudents(triage.studentSignals, track, now),
+      week: buildWeekCapacity(
+        triage.upcomingLessons,
+        triage.dayCapacities,
+        track,
+        now,
+      ),
+      goals: buildGoalsDue(triage.goalReviews, track, now),
+      stats: buildStats(
+        {
+          signals: triage.studentSignals,
+          lessons: triage.upcomingLessons,
+          homework: triage.pendingHomework,
+          assessments: triage.pendingAssessments,
+        },
+        track,
+        now,
+      ),
     };
-  }
-
-  const nextLesson = selectNextLesson(upcomingLessons, track, now);
-
-  return {
-    now,
-    nextUp: buildNextUp(nextLesson, now),
-    prep: buildPrepChecklist(nextLesson, now),
-    workflowStage: deriveWorkflowStage(nextLesson, now),
-    inbox: buildActionInbox(
-      {
-        homework: pendingHomework,
-        assessments: pendingAssessments,
-        tasks: scheduledTasks,
-      },
-      track,
-      nextLesson?.id ?? null,
-      now,
-    ),
-    atRisk: buildAtRiskStudents(studentSignals, track, now),
-    week: buildWeekCapacity(upcomingLessons, dayCapacities, track, now),
-    goals: buildGoalsDue(goalReviews, track, now),
-    stats: buildStats(
-      {
-        signals: studentSignals,
-        lessons: upcomingLessons,
-        homework: pendingHomework,
-        assessments: pendingAssessments,
-      },
-      track,
-      now,
-    ),
-  };
+  }, [track, triage, nowIso]);
 }
 
 function TrackDashboardLayout({
   track,
+  triage,
+  nowIso,
   heading,
   subheading,
   planLabel,
@@ -132,7 +125,7 @@ function TrackDashboardLayout({
   planLabel: string;
 }) {
   const { nextUp, prep, inbox, atRisk, week, goals, stats, workflowStage } =
-    useTrackTriage(track);
+    useTrackTriage(track, triage, nowIso);
 
   return (
     <>

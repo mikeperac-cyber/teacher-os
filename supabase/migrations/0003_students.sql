@@ -148,6 +148,25 @@ as $$
   );
 $$;
 
+-- Is the current user a teacher assigned to this learner?
+--
+-- Queries only `teacher_student_assignments`, never `students`. That matters:
+-- see the note on the students SELECT policy below.
+create or replace function private.is_assigned_teacher(target_student uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.teacher_student_assignments a
+    where a.student_id = target_student
+      and a.teacher_user_id = (select auth.uid())
+  );
+$$;
+
 -- True when the current user is the learner in question.
 create or replace function private.is_own_student_record(target_student uuid)
 returns boolean
@@ -168,10 +187,32 @@ $$;
 -- Policies: students
 -- ---------------------------------------------------------------------------
 
+-- Expressed from the row's own columns rather than through
+-- `can_access_student`, which queries `students` itself.
+--
+-- WHY THIS MATTERS
+-- ----------------
+-- `INSERT ... RETURNING` applies the SELECT policy to the row it returns.
+-- `can_access_student` is STABLE, so it evaluates against the snapshot taken at
+-- the start of the statement and cannot see the row that same statement is
+-- inserting. The result is that an owner creating a student succeeds with a
+-- bare INSERT and fails with `INSERT ... RETURNING` — which is precisely the
+-- shape the Supabase client emits for `.insert().select()`.
+--
+-- Reading `workspace_id` straight off the candidate row avoids the self-query
+-- entirely, and is cheaper besides. Other tables may keep using
+-- `can_access_student` because they reference a *different* table, whose row
+-- already exists and is therefore visible.
 create policy "staff may read students they can access"
   on public.students for select
   to authenticated
-  using (private.can_access_student(id));
+  using (
+    private.is_workspace_owner(workspace_id)
+    or (
+      private.is_workspace_member(workspace_id)
+      and private.is_assigned_teacher(id)
+    )
+  );
 
 create policy "a student may read their own record"
   on public.students for select

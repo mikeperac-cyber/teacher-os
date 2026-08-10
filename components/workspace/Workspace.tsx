@@ -109,7 +109,7 @@ import {
 import { ESL_SKILL_LABELS } from "@/lib/types/domain";
 import type { HomeworkBoard, HomeworkColumn } from "@/lib/types/domain";
 import type { ShellUser } from "@/lib/types/auth";
-import type { DeepLink } from "@/lib/types/dashboard";
+import type { DeepLink, TriageData } from "@/lib/types/dashboard";
 import type { Announce, Area, DestinationPanel, Track } from "@/lib/types/ui";
 
 /** Shown wherever a figure cannot be computed because there are no records. */
@@ -119,7 +119,17 @@ const NO_VALUE = "—";
 const percent = (value: number | null) =>
   value === null ? NO_VALUE : `${value}%`;
 
-export function Workspace({ shellUser }: { shellUser: ShellUser }) {
+export function Workspace({
+  shellUser,
+  triage,
+  nowIso,
+}: {
+  shellUser: ShellUser;
+  /** Fetched on the server for this request; see app/page.tsx. */
+  triage: TriageData;
+  /** The server's clock, so relative times match between render and hydration. */
+  nowIso: string;
+}) {
   const [activeTrack, setActiveTrack] = useState<Track>("ESL");
   const [activeArea, setActiveArea] = useState<Area>("Dashboard");
   const [sidebarCompact, setSidebarCompact] = useState(false);
@@ -437,12 +447,16 @@ export function Workspace({ shellUser }: { shellUser: ShellUser }) {
           {activeArea === "Dashboard" ? (
             activeTrack === "ESL" ? (
               <ESLDashboard
+                triage={triage}
+                nowIso={nowIso}
                 navigate={navigate}
                 onStartLesson={() => setShowLessonPanel(true)}
                 announce={announce}
               />
             ) : (
               <IELTSDashboard
+                triage={triage}
+                nowIso={nowIso}
                 navigate={navigate}
                 onStartLesson={() => setShowLessonPanel(true)}
                 announce={announce}
