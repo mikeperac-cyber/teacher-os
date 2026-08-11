@@ -29,7 +29,7 @@ lib/queries/        server-side reads; return the exact shapes the fixtures did
 lib/fixtures/       the remaining seam; being replaced by queries one module at a time
 lib/actions/        write path, shaped like the server action it will become
 supabase/migrations/ 11 migrations, 27 tables, RLS on every one
-tests/              Vitest — 176 tests, including 65 against a real Postgres
+tests/              Vitest — 177 tests, including 65 against a real Postgres
 ```
 
 ## What works
@@ -97,5 +97,5 @@ tests/              Vitest — 176 tests, including 65 against a real Postgres
 npm run verify
 ```
 
-Type checking, lint, 176 tests and a production build. All green as of this
+Type checking, lint, 177 tests and a production build. All green as of this
 commit.

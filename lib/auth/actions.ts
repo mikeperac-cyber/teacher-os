@@ -21,13 +21,7 @@ import { redirect } from "next/navigation";
 
 import { siteUrl } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
-
-export type AuthFormState = {
-  error: string | null;
-  notice: string | null;
-};
-
-export const EMPTY_AUTH_STATE: AuthFormState = { error: null, notice: null };
+import type { AuthFormState } from "@/lib/types/auth";
 
 const MIN_PASSWORD_LENGTH = 8;
 

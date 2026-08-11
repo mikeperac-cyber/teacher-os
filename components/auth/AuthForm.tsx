@@ -15,12 +15,8 @@ import { useActionState } from "react";
 import { AlertCircle, CheckCircle2, GraduationCap, Loader2 } from "lucide-react";
 import Link from "next/link";
 
-import {
-  EMPTY_AUTH_STATE,
-  signInAction,
-  signUpAction,
-  type AuthFormState,
-} from "@/lib/auth/actions";
+import { signInAction, signUpAction } from "@/lib/auth/actions";
+import { EMPTY_AUTH_STATE, type AuthFormState } from "@/lib/types/auth";
 
 type Mode = "sign-in" | "sign-up";
 

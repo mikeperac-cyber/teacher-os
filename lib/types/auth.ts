@@ -109,3 +109,23 @@ export function roleLabel(role: WorkspaceRole): string {
       return "Student";
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Auth form state                                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What the sign-in / sign-up form renders after a submit.
+ *
+ * Lives here rather than beside the actions because `lib/auth/actions.ts` is a
+ * `"use server"` module, and every export from one of those must be an async
+ * function. Exporting a plain object from it fails at module evaluation with
+ * "A 'use server' file can only export async functions, found object" — and
+ * only when the route is actually rendered, so a passing build proves nothing.
+ */
+export type AuthFormState = {
+  error: string | null;
+  notice: string | null;
+};
+
+export const EMPTY_AUTH_STATE: AuthFormState = { error: null, notice: null };
