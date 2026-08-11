@@ -7,9 +7,9 @@
  * check every `<button>` carried an `onClick`. It could not tell whether a
  * handler did anything, and it broke as soon as components moved.
  *
- * This exercises behaviour: the actions open, the student form validates and
- * writes through the real server action, and the three screens that do not
- * exist yet say so rather than presenting a form that cannot succeed.
+ * This exercises behaviour: three actions perform real writes through server
+ * actions, and the fourth says what it still needs rather than presenting a
+ * form that cannot succeed.
  */
 
 import {
@@ -18,40 +18,85 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { QuickActions } from "@/components/dashboard/QuickActions";
+import type { StudentSignal } from "@/lib/types/domain";
 
-// The real action needs a request context. What matters here is that the
-// component calls it with the right arguments and handles both outcomes.
-const createStudent = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/actions/workflow", () => ({ createStudent }));
+// The real actions need a request context. What matters here is that the
+// component calls them with the right arguments and handles both outcomes.
+const { createStudent, scheduleLesson, assignHomework } = vi.hoisted(() => ({
+  createStudent: vi.fn(),
+  scheduleLesson: vi.fn(),
+  assignHomework: vi.fn(),
+}));
+
+vi.mock("@/lib/actions/workflow", () => ({
+  createStudent,
+  scheduleLesson,
+  assignHomework,
+}));
 
 afterEach(() => {
   cleanup();
   createStudent.mockReset();
+  scheduleLesson.mockReset();
+  assignHomework.mockReset();
 });
 
 const WORKSPACE = "workspace-1";
 
-describe("quick actions", () => {
+const student = (over: Partial<StudentSignal> = {}): StudentSignal => ({
+  studentId: "student-1",
+  name: "Ada Lovelace",
+  initials: "AL",
+  tone: "violet",
+  track: "ESL",
+  lastActiveAt: null,
+  missedHomework: 0,
+  lastProgressAt: null,
+  ...over,
+});
+
+const STUDENTS = [
+  student(),
+  student({ studentId: "student-2", name: "Grace Hopper", track: "IELTS" }),
+];
+
+const setup = (track: "ESL" | "IELTS" = "ESL", workspaceId: string | null = WORKSPACE) =>
+  render(
+    <QuickActions track={track} workspaceId={workspaceId} students={STUDENTS} />,
+  );
+
+/**
+ * Queries scoped to the open modal.
+ *
+ * The action row stays mounted behind it, so "Schedule lesson" and the modal's
+ * "Schedule" submit both match a loose name query.
+ */
+const dialog = () => within(screen.getByRole("dialog"));
+
+describe("the action row", () => {
   it("offers the four create actions", () => {
-    render(<QuickActions track="ESL" workspaceId={WORKSPACE} />);
+    setup();
     expect(screen.getByText("Add learner")).toBeDefined();
-    expect(screen.getByText("Plan lesson")).toBeDefined();
+    expect(screen.getByText("Schedule lesson")).toBeDefined();
     expect(screen.getByText("Assign homework")).toBeDefined();
     expect(screen.getByText("Record check")).toBeDefined();
   });
 
   it("labels the actions for the IELTS workspace", () => {
-    render(<QuickActions track="IELTS" workspaceId={WORKSPACE} />);
+    setup("IELTS");
     expect(screen.getByText("Add candidate")).toBeDefined();
     expect(screen.getByText("Record mock")).toBeDefined();
   });
+});
 
+describe("adding a learner", () => {
   it("opens a modal with track-specific fields", () => {
-    render(<QuickActions track="IELTS" workspaceId={WORKSPACE} />);
+    setup("IELTS");
     fireEvent.click(screen.getByText("Add candidate"));
 
     expect(screen.getByRole("dialog")).toBeDefined();
@@ -60,7 +105,7 @@ describe("quick actions", () => {
   });
 
   it("reports field errors on an empty submit and does not close", async () => {
-    render(<QuickActions track="ESL" workspaceId={WORKSPACE} />);
+    setup();
     fireEvent.click(screen.getByText("Add learner"));
     fireEvent.click(screen.getByRole("button", { name: /create/i }));
 
@@ -73,8 +118,7 @@ describe("quick actions", () => {
 
   it("writes through the server action and closes on success", async () => {
     createStudent.mockResolvedValue({ ok: true, data: { studentId: "s1" } });
-
-    render(<QuickActions track="ESL" workspaceId={WORKSPACE} />);
+    setup();
     fireEvent.click(screen.getByText("Add learner"));
 
     const inputs = screen.getAllByRole("textbox");
@@ -82,10 +126,7 @@ describe("quick actions", () => {
     fireEvent.change(inputs[1], { target: { value: "B1" } });
     fireEvent.click(screen.getByRole("button", { name: /create/i }));
 
-    await waitFor(() => {
-      expect(screen.queryByRole("dialog")).toBeNull();
-    });
-
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(createStudent).toHaveBeenCalledWith({
       workspaceId: WORKSPACE,
       track: "ESL",
@@ -99,8 +140,7 @@ describe("quick actions", () => {
       ok: false,
       error: "You do not have permission to do that.",
     });
-
-    render(<QuickActions track="ESL" workspaceId={WORKSPACE} />);
+    setup();
     fireEvent.click(screen.getByText("Add learner"));
 
     const inputs = screen.getAllByRole("textbox");
@@ -113,9 +153,8 @@ describe("quick actions", () => {
     expect(screen.getByRole("dialog")).toBeDefined();
   });
 
-  /** Nowhere to write to, said before the round trip rather than after. */
   it("refuses to submit with no workspace", async () => {
-    render(<QuickActions track="ESL" workspaceId={null} />);
+    setup("ESL", null);
     fireEvent.click(screen.getByText("Add learner"));
 
     const inputs = screen.getAllByRole("textbox");
@@ -127,23 +166,120 @@ describe("quick actions", () => {
     expect(alert.textContent).toContain("not signed in to a workspace");
     expect(createStudent).not.toHaveBeenCalled();
   });
+});
 
-  /**
-   * The honest gap. A form that cannot succeed is worse than saying so.
-   */
-  it("says what is missing for the screens that are not built", () => {
-    render(<QuickActions track="ESL" workspaceId={WORKSPACE} />);
-    fireEvent.click(screen.getByText("Plan lesson"));
+describe("scheduling a lesson", () => {
+  it("only offers learners from the active track", () => {
+    setup("ESL");
+    fireEvent.click(screen.getByText("Schedule lesson"));
+
+    const options = screen.getAllByRole("option").map((o) => o.textContent);
+    expect(options).toContain("Ada Lovelace");
+    expect(options).not.toContain("Grace Hopper");
+  });
+
+  it("derives the end time from the chosen length", async () => {
+    scheduleLesson.mockResolvedValue({ ok: true, data: { lessonId: "l1" } });
+    setup("ESL");
+    fireEvent.click(screen.getByText("Schedule lesson"));
+
+    const selects = screen.getAllByRole("combobox");
+    fireEvent.change(selects[0], { target: { value: "student-1" } });
+    fireEvent.change(selects[1], { target: { value: "90" } });
+    fireEvent.click(dialog().getByRole("button", { name: /schedule/i }));
+
+    await waitFor(() => expect(scheduleLesson).toHaveBeenCalled());
+
+    const call = scheduleLesson.mock.calls[0][0];
+    expect(call.studentId).toBe("student-1");
+    expect(call.track).toBe("ESL");
+    const minutes =
+      (new Date(call.endsAt).getTime() - new Date(call.startsAt).getTime()) /
+      60000;
+    expect(minutes).toBe(90);
+  });
+
+  it("insists on a learner before writing", async () => {
+    setup("ESL");
+    fireEvent.click(screen.getByText("Schedule lesson"));
+    fireEvent.click(dialog().getByRole("button", { name: /schedule/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Choose which learner");
+    expect(scheduleLesson).not.toHaveBeenCalled();
+  });
+
+  /** Nothing to schedule for, said before the form can be filled in. */
+  it("explains when the track has no learners yet", () => {
+    render(<QuickActions track="ESL" workspaceId={WORKSPACE} students={[]} />);
+    fireEvent.click(screen.getByText("Schedule lesson"));
+
+    expect(screen.getByRole("status").textContent).toContain("No ESL learners yet");
+    expect(
+      dialog().getByRole("button", { name: /schedule/i }),
+    ).toHaveProperty("disabled", true);
+  });
+});
+
+describe("assigning homework", () => {
+  it("writes the assignment with an end-of-day due time", async () => {
+    assignHomework.mockResolvedValue({ ok: true, data: { assignmentId: "a1" } });
+    setup("ESL");
+    fireEvent.click(screen.getByText("Assign homework"));
+
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "student-1" },
+    });
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Unit 6 vocabulary" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create/i }));
+
+    await waitFor(() => expect(assignHomework).toHaveBeenCalled());
+    const call = assignHomework.mock.calls[0][0];
+    expect(call.title).toBe("Unit 6 vocabulary");
+    expect(call.studentId).toBe("student-1");
+    // No date chosen, so no due date is invented.
+    expect(call.dueAt).toBeUndefined();
+  });
+
+  it("insists on a title", async () => {
+    setup("ESL");
+    fireEvent.click(screen.getByText("Assign homework"));
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "student-1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Give the assignment a title.")).toBeDefined();
+    });
+    expect(assignHomework).not.toHaveBeenCalled();
+  });
+});
+
+describe("the screen that is not built", () => {
+  it("says what recording an assessment still needs", () => {
+    setup("IELTS");
+    fireEvent.click(screen.getByText("Record mock"));
 
     const status = screen.getByRole("status");
     expect(status.textContent).toContain("not built yet");
-    expect(status.textContent).toContain("Lesson Planner");
+    expect(status.textContent).toContain("band criteria");
     // No form, so nothing to mistakenly fill in.
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 
+  it("names the ESL equivalent instead on the ESL track", () => {
+    setup("ESL");
+    fireEvent.click(screen.getByText("Record check"));
+    expect(screen.getByRole("status").textContent).toContain("CEFR mastery");
+  });
+});
+
+describe("dismissal", () => {
   it("closes on cancel", () => {
-    render(<QuickActions track="ESL" workspaceId={WORKSPACE} />);
+    setup();
     fireEvent.click(screen.getByText("Add learner"));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog")).toBeNull();

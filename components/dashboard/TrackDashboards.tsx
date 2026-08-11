@@ -141,7 +141,11 @@ function TrackDashboardLayout({
           </p>
           <h1>{heading}</h1>
           <p>{subheading}</p>
-          <QuickActions track={track} workspaceId={workspaceId} />
+          <QuickActions
+            track={track}
+            workspaceId={workspaceId}
+            students={triage.studentSignals}
+          />
         </div>
         <button className="secondary-button" onClick={() => announce(planLabel)}>
           <Sparkles size={16} /> {planLabel}

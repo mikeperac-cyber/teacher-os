@@ -527,6 +527,7 @@ export function Workspace({
           kind={quickCreate}
           track={activeTrack}
           workspaceId={workspaceId}
+          students={triage.studentSignals}
           close={() => setQuickCreate(null)}
         />
       )}

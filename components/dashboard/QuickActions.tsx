@@ -3,24 +3,28 @@
 /**
  * The quick-action row and its modal.
  *
- * "Add learner" performs a real write through `createStudent`, a server action
- * that goes through Row Level Security like every other write.
+ * Three of the four actions now perform real writes through server actions,
+ * which go through Row Level Security like every other write:
  *
- * The other three actions do not have a form yet, because they genuinely need
- * more than two fields: scheduling needs a student and a time, assigning
- * homework needs a student and a due date, recording an assessment needs a
- * student and a set of criteria. Rather than show a form that cannot succeed,
- * the modal says what is missing and points at where the work will live. The
- * previous version reported "created successfully" for a write that never
- * happened; an honest gap is better than a convincing lie.
+ *   Add learner      → createStudent
+ *   Plan lesson      → scheduleLesson   (the plan itself lives in the planner)
+ *   Assign homework  → assignHomework
+ *
+ * Recording an assessment still has no form: it needs a set of criteria to
+ * score against, and those differ per track — four IELTS band criteria against
+ * CEFR mastery percentages. A two-field modal cannot ask for either honestly,
+ * so it says what is missing instead. A form that cannot succeed is worse than
+ * an admission that it does not exist.
+ *
+ * The learner list comes from data the dashboard already fetched, so opening
+ * this costs no extra query.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
   BookOpen,
-  CheckCircle2,
   ClipboardCheck,
   FileCheck2,
   Loader2,
@@ -30,13 +34,14 @@ import {
 } from "lucide-react";
 import type { ElementType } from "react";
 
-import { createStudent } from "@/lib/actions/workflow";
 import {
-  SUBJECT_LABELS,
-  validateDraft,
-  type FieldErrors,
-  type RecordKind,
-} from "@/lib/actions/create-record";
+  assignHomework,
+  createStudent,
+  scheduleLesson,
+} from "@/lib/actions/workflow";
+import { SUBJECT_LABELS, validateDraft } from "@/lib/actions/create-record";
+import type { FieldErrors, RecordKind } from "@/lib/actions/create-record";
+import type { StudentSignal } from "@/lib/types/domain";
 import type { Track } from "@/lib/types/ui";
 
 type QuickAction = {
@@ -59,8 +64,8 @@ const ACTIONS: QuickAction[] = [
   {
     kind: "lesson",
     icon: BookOpen,
-    label: { ESL: "Plan lesson", IELTS: "Plan lesson" },
-    hint: { ESL: "Plan from a CEFR outcome", IELTS: "Plan from a target band" },
+    label: { ESL: "Schedule lesson", IELTS: "Schedule lesson" },
+    hint: { ESL: "Book an ESL lesson", IELTS: "Book an IELTS lesson" },
   },
   {
     kind: "homework",
@@ -85,9 +90,11 @@ const ACTIONS: QuickAction[] = [
 export function QuickActions({
   track,
   workspaceId,
+  students,
 }: {
   track: Track;
   workspaceId: string | null;
+  students: StudentSignal[];
 }) {
   const [openKind, setOpenKind] = useState<RecordKind | null>(null);
 
@@ -115,6 +122,7 @@ export function QuickActions({
           kind={openKind}
           track={track}
           workspaceId={workspaceId}
+          students={students}
           close={() => setOpenKind(null)}
         />
       )}
@@ -124,52 +132,60 @@ export function QuickActions({
 
 const HEADINGS: Record<RecordKind, Record<Track, string>> = {
   student: { ESL: "New ESL learner", IELTS: "New IELTS candidate" },
-  lesson: { ESL: "Plan an ESL lesson", IELTS: "Plan an IELTS lesson" },
+  lesson: { ESL: "Schedule an ESL lesson", IELTS: "Schedule an IELTS lesson" },
   homework: { ESL: "Assign ESL homework", IELTS: "Assign IELTS practice" },
   assessment: { ESL: "Record a progress check", IELTS: "Record a mock result" },
 };
 
-/** What each unbuilt screen still needs, stated plainly. */
-const NOT_BUILT: Record<
-  Exclude<RecordKind, "student">,
-  { needs: string; lives: string }
-> = {
-  lesson: {
-    needs: "a student to teach and a time to teach them",
-    lives: "the Lesson Planner",
-  },
-  homework: {
-    needs: "a student, a task and a due date",
-    lives: "the Homework board",
-  },
-  assessment: {
-    needs: "a student and a set of criteria to score against",
-    lives: "Assessments",
-  },
-};
+const DURATIONS = [30, 45, 60, 90];
+
+/** Local datetime string for an `<input type="datetime-local">`. */
+function toLocalInputValue(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** Tomorrow at 10:00, as a sensible default rather than an empty field. */
+function defaultLessonStart(): string {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  date.setHours(10, 0, 0, 0);
+  return toLocalInputValue(date);
+}
 
 export function CreateRecordModal({
   kind,
   track,
   workspaceId,
+  students,
   close,
 }: {
   kind: RecordKind;
   track: Track;
   workspaceId: string | null;
+  students: StudentSignal[];
   close: () => void;
 }) {
+  // Shared form state. Which fields are used depends on `kind`.
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [startsAt, setStartsAt] = useState(defaultLessonStart);
+  const [duration, setDuration] = useState(60);
+  const [dueAt, setDueAt] = useState("");
+
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [status, setStatus] = useState<"idle" | "saving" | "failed" | "saved">(
-    "idle",
-  );
+  const [status, setStatus] = useState<"idle" | "saving" | "failed">("idle");
   const [message, setMessage] = useState<string | null>(null);
-  const titleRef = useRef<HTMLInputElement>(null);
+  const firstFieldRef = useRef<HTMLElement>(null);
+
+  const trackStudents = useMemo(
+    () => students.filter((student) => student.track === track),
+    [students, track],
+  );
 
   useEffect(() => {
-    titleRef.current?.focus();
+    firstFieldRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") close();
     };
@@ -177,50 +193,124 @@ export function CreateRecordModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const fail = (text: string) => {
+    setStatus("failed");
+    setMessage(text);
+  };
 
-    const draft = { kind, track, title, subject };
-    const fieldErrors = validateDraft(draft);
+  const needsWorkspace = () => {
+    if (workspaceId) return false;
+    fail("You are not signed in to a workspace, so there is nowhere to save this.");
+    return true;
+  };
+
+  const submitStudent = async () => {
+    const fieldErrors = validateDraft({ kind: "student", track, title, subject });
     setErrors(fieldErrors);
-    if (Object.keys(fieldErrors).length) {
-      setStatus("idle");
-      setMessage(null);
-      return;
-    }
-
-    if (!workspaceId) {
-      setStatus("failed");
-      setMessage(
-        "You are not signed in to a workspace, so there is nowhere to save this.",
-      );
-      return;
-    }
+    if (Object.keys(fieldErrors).length) return;
+    if (needsWorkspace()) return;
 
     setStatus("saving");
     setMessage(null);
-
     const result = await createStudent({
-      workspaceId,
+      workspaceId: workspaceId!,
       track,
       fullName: title,
       target: subject,
     });
 
-    if (result.ok) {
-      setStatus("saved");
-      setMessage(null);
-      // The server action revalidates, so closing reveals the new learner.
-      close();
-      return;
-    }
-
-    setStatus("failed");
-    setMessage(result.error);
+    if (result.ok) return close();
+    fail(result.error);
     if (result.field === "target") setErrors({ subject: result.error });
   };
 
+  const submitLesson = async () => {
+    if (!studentId) return fail("Choose which learner this lesson is for.");
+    if (!startsAt) return fail("Choose when the lesson starts.");
+    if (needsWorkspace()) return;
+
+    const start = new Date(startsAt);
+    if (Number.isNaN(start.getTime())) return fail("That start time is not valid.");
+    const end = new Date(start.getTime() + duration * 60 * 1000);
+
+    setStatus("saving");
+    setMessage(null);
+    const result = await scheduleLesson({
+      workspaceId: workspaceId!,
+      studentId,
+      track,
+      startsAt: start.toISOString(),
+      endsAt: end.toISOString(),
+      title: title.trim() || undefined,
+    });
+
+    if (result.ok) return close();
+    fail(result.error);
+  };
+
+  const submitHomework = async () => {
+    if (!studentId) return fail("Choose which learner this is for.");
+    if (!title.trim()) {
+      setErrors({ title: "Give the assignment a title." });
+      return;
+    }
+    if (needsWorkspace()) return;
+
+    setStatus("saving");
+    setMessage(null);
+    const result = await assignHomework({
+      workspaceId: workspaceId!,
+      studentId,
+      track,
+      title,
+      // A date input gives midnight local; due end-of-day is what a teacher means.
+      dueAt: dueAt ? new Date(`${dueAt}T23:59`).toISOString() : undefined,
+    });
+
+    if (result.ok) return close();
+    fail(result.error);
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (kind === "student") return submitStudent();
+    if (kind === "lesson") return submitLesson();
+    if (kind === "homework") return submitHomework();
+  };
+
   const heading = HEADINGS[kind][track];
+  const saving = status === "saving";
+
+  /** Shared: a learner chooser, or an explanation of why there is none. */
+  const studentField = (
+    <label>
+      <span>{track === "ESL" ? "Learner" : "Candidate"}</span>
+      {trackStudents.length === 0 ? (
+        <p className="create-modal-pending" role="status">
+          <AlertCircle size={15} />
+          <span>
+            No {track} {track === "ESL" ? "learners" : "candidates"} yet. Add one
+            first — there is nobody to schedule for.
+          </span>
+        </p>
+      ) : (
+        <select
+          value={studentId}
+          onChange={(event) => setStudentId(event.target.value)}
+        >
+          <option value="">Choose…</option>
+          {trackStudents.map((student) => (
+            <option key={student.studentId} value={student.studentId}>
+              {student.name}
+            </option>
+          ))}
+        </select>
+      )}
+    </label>
+  );
+
+  const canSubmit =
+    kind === "student" || (kind !== "assessment" && trackStudents.length > 0);
 
   return (
     <div className="modal-backdrop" onMouseDown={close}>
@@ -241,42 +331,131 @@ export function CreateRecordModal({
           </button>
         </header>
 
-        {kind === "student" ? (
+        {kind === "assessment" ? (
+          <div className="create-modal-body">
+            <p className="create-modal-pending" role="status">
+              <AlertCircle size={15} />
+              <span>
+                This screen is not built yet. Recording{" "}
+                {track === "ESL" ? "a progress check" : "a mock result"} needs a
+                set of criteria to score against —{" "}
+                {track === "ESL"
+                  ? "CEFR mastery across each language system"
+                  : "the four official band criteria"}{" "}
+                — which is more than this form can ask for. It will live in
+                Assessments.
+              </span>
+            </p>
+            <div className="create-modal-actions">
+              <button type="button" className="primary-button" onClick={close}>
+                Understood <ArrowRight size={15} />
+              </button>
+            </div>
+          </div>
+        ) : (
           <form className="create-modal-body" onSubmit={submit} noValidate>
-            <label className={errors.title ? "has-error" : ""}>
-              <span>{track === "ESL" ? "Learner name" : "Candidate name"}</span>
-              <input
-                ref={titleRef}
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Full name"
-                aria-invalid={Boolean(errors.title)}
-              />
-              {errors.title && <small role="alert">{errors.title}</small>}
-            </label>
+            {kind === "student" && (
+              <>
+                <label className={errors.title ? "has-error" : ""}>
+                  <span>
+                    {track === "ESL" ? "Learner name" : "Candidate name"}
+                  </span>
+                  <input
+                    ref={firstFieldRef as React.RefObject<HTMLInputElement>}
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="Full name"
+                    aria-invalid={Boolean(errors.title)}
+                  />
+                  {errors.title && <small role="alert">{errors.title}</small>}
+                </label>
 
-            <label className={errors.subject ? "has-error" : ""}>
-              <span>{SUBJECT_LABELS[kind][track]}</span>
-              <input
-                value={subject}
-                onChange={(event) => setSubject(event.target.value)}
-                placeholder={track === "ESL" ? "B1" : "7.0"}
-                aria-invalid={Boolean(errors.subject)}
-              />
-              {errors.subject && <small role="alert">{errors.subject}</small>}
-            </label>
+                <label className={errors.subject ? "has-error" : ""}>
+                  <span>{SUBJECT_LABELS.student[track]}</span>
+                  <input
+                    value={subject}
+                    onChange={(event) => setSubject(event.target.value)}
+                    placeholder={track === "ESL" ? "B1" : "7.0"}
+                    aria-invalid={Boolean(errors.subject)}
+                  />
+                  {errors.subject && (
+                    <small role="alert">{errors.subject}</small>
+                  )}
+                </label>
+              </>
+            )}
+
+            {kind === "lesson" && (
+              <>
+                {studentField}
+                <label>
+                  <span>Starts</span>
+                  <input
+                    type="datetime-local"
+                    value={startsAt}
+                    onChange={(event) => setStartsAt(event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Length</span>
+                  <select
+                    value={duration}
+                    onChange={(event) => setDuration(Number(event.target.value))}
+                  >
+                    {DURATIONS.map((minutes) => (
+                      <option key={minutes} value={minutes}>
+                        {minutes} minutes
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Title (optional)</span>
+                  <input
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder={
+                      track === "ESL"
+                        ? "Past simple storytelling"
+                        : "Writing Task 2"
+                    }
+                  />
+                </label>
+              </>
+            )}
+
+            {kind === "homework" && (
+              <>
+                {studentField}
+                <label className={errors.title ? "has-error" : ""}>
+                  <span>Assignment</span>
+                  <input
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder={
+                      track === "ESL"
+                        ? "Unit 6 vocabulary practice"
+                        : "Timed Task 2 response"
+                    }
+                    aria-invalid={Boolean(errors.title)}
+                  />
+                  {errors.title && <small role="alert">{errors.title}</small>}
+                </label>
+                <label>
+                  <span>Due (optional)</span>
+                  <input
+                    type="date"
+                    value={dueAt}
+                    onChange={(event) => setDueAt(event.target.value)}
+                  />
+                </label>
+              </>
+            )}
 
             {status === "failed" && message && (
               <p className="create-modal-error" role="alert">
                 <AlertCircle size={15} />
                 <span>{message}</span>
-              </p>
-            )}
-
-            {status === "saved" && (
-              <p className="create-modal-notice" role="status">
-                <CheckCircle2 size={15} />
-                <span>Saved.</span>
               </p>
             )}
 
@@ -287,39 +466,21 @@ export function CreateRecordModal({
               <button
                 type="submit"
                 className="primary-button"
-                disabled={status === "saving"}
+                disabled={saving || !canSubmit}
               >
-                {status === "saving" ? (
+                {saving ? (
                   <>
                     <Loader2 size={15} className="spin" /> Saving…
                   </>
                 ) : (
                   <>
-                    <Plus size={15} /> Create
+                    <Plus size={15} />
+                    {kind === "lesson" ? "Schedule" : "Create"}
                   </>
                 )}
               </button>
             </div>
           </form>
-        ) : (
-          <div className="create-modal-body">
-            <p className="create-modal-pending" role="status">
-              <AlertCircle size={15} />
-              <span>
-                This screen is not built yet. {heading} needs{" "}
-                {NOT_BUILT[kind].needs}, which is more than this form can ask
-                for — it will live in {NOT_BUILT[kind].lives}.
-              </span>
-            </p>
-            <div className="create-modal-actions">
-              <button type="button" className="secondary-button" onClick={close}>
-                Close
-              </button>
-              <button type="button" className="primary-button" onClick={close}>
-                Understood <ArrowRight size={15} />
-              </button>
-            </div>
-          </div>
         )}
       </div>
     </div>

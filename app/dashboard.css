@@ -290,6 +290,7 @@
 .create-modal-body label { display: flex; flex-direction: column; gap: 5px; }
 .create-modal-body label > span { font-size: 10px; font-weight: 640; color: #656c7c; }
 .create-modal-body input,
+.create-modal-body select,
 .create-modal-body textarea {
   width: 100%; padding: 9px 11px;
   border: 1px solid var(--line); border-radius: 9px;
@@ -297,10 +298,14 @@
 }
 .create-modal-body textarea { min-height: 64px; resize: vertical; }
 .create-modal-body input:focus,
+.create-modal-body select:focus,
 .create-modal-body textarea:focus {
   outline: none; border-color: var(--track, var(--violet));
   background: #fff; box-shadow: 0 0 0 3px var(--track-soft, var(--violet-soft));
 }
+.create-modal-body select { appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23767d8c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center; padding-right: 30px; }
 .create-modal-body label.has-error input { border-color: #d4622a; background: #fffaf8; }
 .create-modal-body label > small { color: #c2551f; font-size: 9.5px; font-weight: 600; }
 .create-modal-error {
@@ -328,7 +333,9 @@
 .create-modal-pending svg { flex: 0 0 auto; margin-top: 1px; }
 
 .create-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
-.create-modal-actions .primary-button:disabled { opacity: .65; cursor: progress; }
+/* Disabled because there is nothing to submit — not because it is working.
+   `progress` here read as "loading" on a button that was simply unavailable. */
+.create-modal-actions .primary-button:disabled { opacity: .55; cursor: not-allowed; }
 .spin { animation: dashboard-spin 900ms linear infinite; }
 @keyframes dashboard-spin { to { transform: rotate(360deg); } }
 

@@ -1,6 +1,6 @@
 # Current state
 
-Last updated 10 August 2026, after Phase 3.
+Last updated 11 August 2026.
 
 For the original export's state, see `git show 294b548` and the version of this
 file at that commit.
@@ -28,8 +28,8 @@ lib/types/          domain.ts is the contract the Supabase schema derives from
 lib/queries/        server-side reads; return the exact shapes the fixtures did
 lib/fixtures/       the remaining seam; being replaced by queries one module at a time
 lib/actions/        write path, shaped like the server action it will become
-supabase/migrations/ 9 migrations, 27 tables, RLS on every one
-tests/              Vitest — 137 tests, including 56 against a real Postgres
+supabase/migrations/ 10 migrations, 27 tables, RLS on every one
+tests/              Vitest — 173 tests, including 62 against a real Postgres
 ```
 
 ## What works
@@ -63,11 +63,15 @@ tests/              Vitest — 137 tests, including 56 against a real Postgres
 - **No data**, because there is no project to hold any. The dashboard now reads
   through `lib/queries/triage.ts` rather than fixtures, and returns empty until
   a project exists.
-- **The workflow actions have no dedicated UI yet.** `lib/actions/workflow.ts`
-  implements all eight steps of the vertical slice and they are proven against a
-  real Postgres in `tests/db/workflow.test.ts`, but only "create student" has a
-  form wired to it. Scheduling, preparation, submission, feedback and progress
-  entry still need screens.
+- **Four of the eight workflow steps have no screen yet.** Creating a learner,
+  scheduling a lesson and assigning homework all write for real from the quick
+  actions. Lesson preparation, student submission, feedback and progress entry
+  are implemented in `lib/actions/workflow.ts` and proven against a real
+  Postgres in `tests/db/workflow.test.ts`, but have no form.
+
+  Recording an assessment is the one quick action with no form, because it needs
+  a set of criteria to score against and those differ per track. It says so
+  rather than showing a form that cannot succeed.
 - **No student shell.** Role reaches the interface, but a student currently sees
   the same layout as a teacher. They would read nothing they should not — RLS
   refuses it in Postgres — but the screens are not yet built for them.
@@ -91,5 +95,5 @@ tests/              Vitest — 137 tests, including 56 against a real Postgres
 npm run verify
 ```
 
-Type checking, lint, 137 tests and a production build. All green as of this
+Type checking, lint, 173 tests and a production build. All green as of this
 commit.
