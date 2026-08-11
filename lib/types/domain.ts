@@ -505,8 +505,15 @@ export type UpcomingLesson = {
   /** ESL: communicative outcome. IELTS: band objective. Null if unplanned. */
   objective: string | null;
   hasPlan: boolean;
-  /** Materials attached to the plan. */
-  materialCount: number;
+  /**
+   * Timed activities in the saved lesson flow.
+   *
+   * Named for what it counts. It was `materialCount`, which was wrong twice
+   * over: it read from `lesson_plans.blocks`, and nothing yet attaches a
+   * material to a lesson at all — so the prep checklist claimed resources were
+   * ready on the strength of a teacher having sketched a rundown.
+   */
+  plannedBlocks: number;
   /** Whether the previous homework has been checked and returned. */
   homeworkReturned: boolean;
   /** ISO timestamp of the last goal review, or null if never reviewed. */
@@ -547,12 +554,20 @@ export type StudentSignal = {
 
 /** Homework awaiting the teacher. Backed by `homework_submissions`. */
 export type PendingHomework = {
+  /** The submission id — what feedback is written against. */
   id: string;
+  /**
+   * Carried because feedback is stored per learner as well as per submission,
+   * and the marking screen must not have to guess who submitted it.
+   */
+  studentId: string;
   studentName: string;
   studentInitials: string;
   tone: Tone;
   track: Track;
   task: string;
+  /** What the learner wrote. Empty when they submitted a file only. */
+  body: string;
   /** ISO timestamp the teacher should return it by. */
   dueAt: string | null;
   /** Lesson this must be returned before, if any. */

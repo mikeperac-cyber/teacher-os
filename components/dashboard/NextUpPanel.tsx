@@ -150,12 +150,15 @@ export function NextUpPanel({
 
       <div className="next-up-footer">
         <div className="next-up-links">
+          {/* The badge belongs on Plan, not Materials: it counts activities in
+              the saved lesson flow, and nothing attaches a material to a lesson
+              yet. */}
           <button onClick={() => navigate(lesson.links.plan)}>
             <NotebookPen size={15} /> Plan
+            {lesson.plannedBlocks > 0 && <b>{lesson.plannedBlocks}</b>}
           </button>
           <button onClick={() => navigate(lesson.links.materials)}>
             <FileText size={15} /> Materials
-            {lesson.materialCount > 0 && <b>{lesson.materialCount}</b>}
           </button>
           <button
             onClick={() => navigate(lesson.links.lastNotes)}

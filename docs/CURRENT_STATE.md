@@ -1,6 +1,6 @@
 # Current state
 
-Last updated 11 August 2026, after connecting the dev Supabase project.
+Last updated 11 August 2026, after building the teacher loop.
 
 For the original export's state, see `git show 294b548` and the version of this
 file at that commit.
@@ -15,12 +15,15 @@ file at that commit.
   see `adr/0001-production-runtime-and-database.md`.
 
 ```
-app/                route, auth screens, layout, three stylesheets
+app/                route, auth screens, layout, four stylesheets
   page.tsx          server component — resolves the session, renders the shell
   (auth)/           sign-in and sign-up (route group; URLs are /sign-in, /sign-up)
   auth/callback/    exchanges the email-confirmation code for a session
 proxy.ts            session refresh + redirect for signed-out requests
 components/         primitives, dashboard triage panels, auth form, workspace shell
+  planner/          lesson preparation — brief, rundown, readiness
+  homework/         homework checking — queue and marking pane
+  progress/         two entry forms, one per track, deliberately not shared
 lib/supabase/       browser / server / admin clients, and `isSupabaseConfigured`
 lib/auth/           session resolution and the sign-in/up/out server actions
 lib/dashboard/      triage rules — pure functions, every one takes `now` explicitly
@@ -29,7 +32,7 @@ lib/queries/        server-side reads; return the exact shapes the fixtures did
 lib/fixtures/       the remaining seam; being replaced by queries one module at a time
 lib/actions/        write path, shaped like the server action it will become
 supabase/migrations/ 11 migrations, 27 tables, RLS on every one
-tests/              Vitest — 177 tests, including 65 against a real Postgres
+tests/              Vitest — 210 tests, including 65 against a real Postgres
 ```
 
 ## What works
@@ -42,6 +45,18 @@ tests/              Vitest — 177 tests, including 65 against a real Postgres
   at-risk learners, week capacity, goal reviews due, derived clickable stats.
 - Quick actions open a real modal with real validation, from both the dashboard
   and the topbar.
+- **Lesson preparation.** Pick an upcoming lesson, write the objective — a CEFR
+  outcome on ESL, a band objective on IELTS — build a timed lesson flow, and
+  save or mark it ready. Readiness is reported from the saved record using the
+  same derivation as the dashboard, not from tick boxes; a checklist a teacher
+  can lie to is worse than none.
+- **Homework checking.** The queue of work waiting on the teacher, the learner's
+  submission, and a feedback pane. Saving and releasing are separate actions:
+  the learner reads nothing until `released_at` is set, which Postgres enforces.
+- **Progress entry**, one form per track and never merged: CEFR mastery
+  percentages for ESL, half-band selects for IELTS. Both can record privately or
+  share with the learner. Skills left blank are not sent — an unobserved skill is
+  not a zero.
 - Per-area filtering and sorting within a session.
 - Every screen has a designed empty state.
 
@@ -65,15 +80,25 @@ tests/              Vitest — 177 tests, including 65 against a real Postgres
   and the round trip confirmed it (`42501`). It is a deliberate boundary, but it
   means paper homework, or work a learner emails over, currently has nowhere to
   go. Needs a product decision before a staff INSERT policy is added.
-- **Four of the eight workflow steps have no screen yet.** Creating a learner,
-  scheduling a lesson and assigning homework all write for real from the quick
-  actions. Lesson preparation, student submission, feedback and progress entry
-  are implemented in `lib/actions/workflow.ts` and proven against a real
-  Postgres in `tests/db/workflow.test.ts`, but have no form.
+- **One of the eight workflow steps still has no screen: student submission.**
+  Everything the teacher does now has a form. `submitHomework` is implemented in
+  `lib/actions/workflow.ts` and proven against a real Postgres in
+  `tests/db/workflow.test.ts`, but the learner has nowhere to submit from — see
+  "No student shell" below.
 
   Recording an assessment is the one quick action with no form, because it needs
   a set of criteria to score against and those differ per track. It says so
   rather than showing a form that cannot succeed.
+- **The four-column homework board is not rendered.** `getTriageData` fetches
+  only work waiting on the teacher, so a board would show two permanently empty
+  columns and imply nothing was ever assigned. `HOMEWORK_COLUMNS`,
+  `HOMEWORK_COLUMN_LABELS` and `homeworkBoardByTrack` remain in `lib/fixtures/`
+  as the contract for when the assigned and returned queries land.
+- **Nothing attaches a material to a lesson.** The prep checklist used to claim
+  otherwise: it read `lesson_plans.blocks` and reported the count as "Materials
+  attached". The field is now `plannedBlocks` and the item reads "Lesson flow
+  prepared", which is what it actually measures. A real materials link needs a
+  join table and the file-upload path.
 - **No student shell.** Role reaches the interface, but a student currently sees
   the same layout as a teacher. They would read nothing they should not — RLS
   refuses it in Postgres — but the screens are not yet built for them.
@@ -88,6 +113,9 @@ tests/              Vitest — 177 tests, including 65 against a real Postgres
 - Do not use one generic progress table for both tracks. CEFR mastery and IELTS
   bands are different measurements on different scales.
 - Do not treat a toast or a closed drawer as a successful write.
+- Releasing is a separate act from saving, for both feedback and progress. A
+  screen that always sent `release: true` would make the policy that protects
+  half-written feedback unreachable, and nothing would fail loudly.
 - `lib/dashboard/` thresholds are pedagogical judgements. Change them
   deliberately, and update the tests that state them.
 
@@ -97,5 +125,11 @@ tests/              Vitest — 177 tests, including 65 against a real Postgres
 npm run verify
 ```
 
-Type checking, lint, 177 tests and a production build. All green as of this
+Type checking, lint, 210 tests and a production build. All green as of this
 commit.
+
+Two of the new test files were checked against deliberately introduced bugs
+before being trusted: sending `release: true` from the save button, sending `0`
+for unobserved skills, and dropping the `submissions` prop on the way into the
+homework screen. Each was caught. A test that has never failed has not been
+shown to test anything.

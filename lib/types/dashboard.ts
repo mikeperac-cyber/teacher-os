@@ -54,7 +54,8 @@ export type NextUpLesson = {
   /** 0–100, from the prep checklist. */
   readiness: number;
   hasPlan: boolean;
-  materialCount: number;
+  /** Timed activities in the saved lesson flow. */
+  plannedBlocks: number;
   /** Post-class notes from this student's previous lesson. */
   lastNotes: string | null;
   links: {

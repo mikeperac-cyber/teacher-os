@@ -97,7 +97,7 @@ export async function getTriageData(now: Date): Promise<TriageData> {
     supabase
       .from("homework_submissions")
       .select(
-        `id, student_id, status,
+        `id, student_id, status, body,
          homework_assignments ( title, track, due_at, estimated_minutes, blocks_lesson_id ),
          students ( full_name ),
          homework_feedback ( released_at )`,

@@ -33,12 +33,12 @@ describe("prep checklist", () => {
     expect(prep.ready).toBe(false);
   });
 
-  it("blocks on a missing plan and on missing materials", () => {
+  it("blocks on a missing plan and on an unplanned lesson flow", () => {
     const prep = buildPrepChecklist(
-      lesson({ hasPlan: false, materialCount: 0 }),
+      lesson({ hasPlan: false, plannedBlocks: 0 }),
       NOW,
     );
-    expect(prep.blockers.map((b) => b.id)).toEqual(["plan", "materials"]);
+    expect(prep.blockers.map((b) => b.id)).toEqual(["plan", "lesson-flow"]);
   });
 
   it("treats a stale goal review as advisory, not blocking", () => {
@@ -124,7 +124,7 @@ describe("workflow stage", () => {
   });
 
   it("moves to Prepare once homework is returned but the plan is incomplete", () => {
-    expect(deriveWorkflowStage(lesson({ materialCount: 0 }), NOW)).toBe(3);
+    expect(deriveWorkflowStage(lesson({ plannedBlocks: 0 }), NOW)).toBe(3);
   });
 
   it("reaches Deliver when everything is ready", () => {

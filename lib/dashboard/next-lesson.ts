@@ -70,7 +70,7 @@ export function deriveWorkflowStage(
     return 4; // Deliver
   }
   if (!lesson.homeworkReturned) return 2; // Check HW
-  if (!lesson.hasPlan || lesson.materialCount === 0) return 3; // Prepare
+  if (!lesson.hasPlan || lesson.plannedBlocks === 0) return 3; // Prepare
   return 4; // Ready to deliver
 }
 
@@ -101,7 +101,7 @@ export function buildNextUp(
     objective: lesson.objective,
     readiness: prep.readiness,
     hasPlan: lesson.hasPlan,
-    materialCount: lesson.materialCount,
+    plannedBlocks: lesson.plannedBlocks,
     lastNotes: lesson.lastNotes,
     links: {
       plan: { area: "Lesson Planner", detail: lesson.studentName },

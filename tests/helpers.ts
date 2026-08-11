@@ -53,7 +53,7 @@ export function lesson(overrides: Partial<UpcomingLesson> = {}): UpcomingLesson 
     endsAt: iso(hoursFromNow(3)),
     objective: "Narrate a past event",
     hasPlan: true,
-    materialCount: 2,
+    plannedBlocks: 2,
     homeworkReturned: true,
     goalsReviewedAt: iso(daysFromNow(-3)),
     lastNotes: "Confident with past simple",
@@ -66,11 +66,13 @@ export function homework(
 ): PendingHomework {
   return {
     id: "h1",
+    studentId: "s1",
     studentName: "Test Learner",
     studentInitials: "TL",
     tone: "amber",
     track: "ESL",
     task: "Unit 6 vocabulary",
+    body: "Answers to units 6.1 and 6.2.",
     dueAt: iso(hoursFromNow(4)),
     blocksLessonId: null,
     minutes: 20,

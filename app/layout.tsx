@@ -5,6 +5,8 @@ import "./globals.css";
 // to the export and the Phase 1 visual-regression check remains meaningful.
 import "./dashboard.css";
 import "./auth.css";
+// Lesson preparation, homework checking and progress entry.
+import "./workflow.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });

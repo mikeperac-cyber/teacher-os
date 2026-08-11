@@ -63,15 +63,15 @@ export function buildPrepChecklist(
       link: { area: "Lesson Planner", detail: lesson.studentName },
     },
     {
-      id: "materials",
-      label: "Materials attached",
+      id: "lesson-flow",
+      label: "Lesson flow prepared",
       detail:
-        lesson.materialCount > 0
-          ? `${lesson.materialCount} attached to this lesson`
-          : "Nothing attached — the lesson has no resources to teach from",
-      ready: lesson.materialCount > 0,
+        lesson.plannedBlocks > 0
+          ? `${lesson.plannedBlocks} timed activit${lesson.plannedBlocks === 1 ? "y" : "ies"}`
+          : "No activities planned — the lesson has no shape to teach to",
+      ready: lesson.plannedBlocks > 0,
       blocking: true,
-      link: { area: "Materials", detail: lesson.studentName },
+      link: { area: "Lesson Planner", detail: lesson.studentName },
     },
     {
       id: "goals",

@@ -102,7 +102,7 @@ export function mapLesson(row: LessonQueryRow): UpcomingLesson {
     endsAt: row.ends_at,
     objective: plan?.objective ?? null,
     hasPlan: plan !== null,
-    materialCount: blocks.length,
+    plannedBlocks: blocks.length,
     // Both are filled in by getTriageData once the related rows are known.
     homeworkReturned: true,
     goalsReviewedAt: null,
@@ -118,6 +118,7 @@ export type SubmissionQueryRow = {
   id: string;
   student_id: string;
   status: string;
+  body?: string | null;
   students?: unknown;
   homework_assignments?: unknown;
   homework_feedback?: unknown;
@@ -150,11 +151,13 @@ export function mapSubmission(row: SubmissionQueryRow): PendingHomework {
 
   return {
     id: row.id,
+    studentId: row.student_id,
     studentName: name,
     studentInitials: initialsFrom(name),
     tone: toneFor(row.student_id),
     track: toTrackLabel(assignment?.track ?? "esl"),
     task: assignment?.title ?? "Homework",
+    body: row.body ?? "",
     dueAt: assignment?.due_at ?? null,
     blocksLessonId: assignment?.blocks_lesson_id ?? null,
     minutes: assignment?.estimated_minutes ?? null,

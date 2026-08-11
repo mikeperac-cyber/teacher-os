@@ -73,7 +73,7 @@ describe("mapLesson", () => {
     );
     expect(lesson.hasPlan).toBe(true);
     expect(lesson.objective).toBe("Band 7 task response");
-    expect(lesson.materialCount).toBe(2);
+    expect(lesson.plannedBlocks).toBe(2);
   });
 
   it("finds the plan when PostgREST returns an array", () => {

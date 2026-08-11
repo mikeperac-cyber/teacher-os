@@ -1,0 +1,163 @@
+/* ------------------------------------------------------------------ */
+/* Teacher-loop screens: preparation, homework checking, progress entry */
+/* ------------------------------------------------------------------ */
+/*
+ * Kept out of globals.css for the same reason dashboard.css is: that file is
+ * byte-identical to the original export, which is what makes the Phase 1 visual
+ * comparison meaningful. Everything here borrows the existing tokens — the same
+ * greys, radii and 8–11px type scale — so the new screens read as part of the
+ * product rather than as something bolted on.
+ */
+
+/* ---------------------------------------------------------------- */
+/* Shared form shell                                                 */
+/* ---------------------------------------------------------------- */
+/* Mirrors .planner-form from globals.css. Named separately rather than reused
+   so that a change to the planner cannot silently restyle homework marking. */
+
+.workflow-form { padding: 2px 17px 17px; }
+.workflow-form label { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.workflow-form label > span { color: #777e8d; font-size: 8.5px; font-weight: 620; }
+.workflow-form input,
+.workflow-form textarea,
+.workflow-form select {
+  width: 100%; border: 1px solid #e0e0e5; border-radius: 8px; outline: 0;
+  color: #4c5362; background: #fafafa; padding: 9px;
+  font-size: 9.5px; line-height: 1.45; font-family: inherit;
+}
+.workflow-form input:focus,
+.workflow-form textarea:focus,
+.workflow-form select:focus {
+  border-color: #b8b2ed; background: #fff; box-shadow: 0 0 0 3px #f1efff;
+}
+.workflow-form textarea { min-height: 76px; resize: vertical; }
+.workflow-form textarea.tall { min-height: 128px; }
+.workflow-form select { appearance: none; cursor: pointer; padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23767d8c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 9px center; }
+
+.workflow-form .create-modal-error,
+.workflow-form .create-modal-notice,
+.planner-form .planner-message { margin-bottom: 12px; font-size: 9.5px; }
+
+/* Two rows of buttons on narrow columns, one on wide ones. */
+.workflow-actions,
+.planner-actions {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px;
+}
+.workflow-actions button,
+.planner-actions button { flex: 1 1 auto; min-height: 34px; font-size: 10px; }
+.workflow-actions .primary-button:disabled,
+.workflow-actions .secondary-button:disabled,
+.planner-actions .primary-button:disabled,
+.planner-actions .secondary-button:disabled { opacity: .55; cursor: not-allowed; }
+
+/* A form panel that must not stretch to the width of a data table. */
+.workflow-entry-slot { width: 100%; max-width: 460px; }
+
+/* Score fields sit in a grid: six CEFR skills or four IELTS criteria. */
+.score-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-bottom: 12px; }
+.score-grid label { margin-bottom: 0; }
+.score-grid input { text-align: center; }
+
+/* ---------------------------------------------------------------- */
+/* Lesson planner                                                    */
+/* ---------------------------------------------------------------- */
+
+/* The lesson picker lives in the panel head, so it cannot inherit the form
+   styling below it. */
+.planner-lesson-select {
+  max-width: 190px; border: 1px solid #e0e0e5; border-radius: 8px;
+  color: #5b6274; background: #fafafa; padding: 6px 22px 6px 8px;
+  font-size: 8.5px; font-family: inherit; cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23767d8c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 7px center;
+}
+.planner-lesson-select:focus { outline: 0; border-color: #b8b2ed; box-shadow: 0 0 0 3px #f1efff; }
+
+.planner-message {
+  display: flex; align-items: flex-start; gap: 7px; margin: 0 0 12px;
+  padding: 9px 10px; border-radius: 9px; line-height: 1.5;
+}
+.planner-message svg { flex: 0 0 auto; margin-top: 1px; }
+.planner-message.is-error { background: #fff4ee; border: 1px solid #f6d9c9; color: #a8471a; }
+.planner-message.is-notice { background: var(--mint-soft); border: 1px solid #cfeee2; color: #217d5f; }
+
+/* Editable rundown rows. The read-only row styling in globals.css targets
+   `strong`/`small`, so the input variant needs its own sizing. */
+.rundown-row.is-editable { padding: 9px 17px; align-items: center; }
+.rundown-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.rundown-fields input,
+.rundown-time-input {
+  border: 1px solid transparent; border-radius: 7px; outline: 0;
+  color: #4c5362; background: #fafafa; padding: 6px 7px;
+  font-size: 9px; font-family: inherit; width: 100%;
+}
+.rundown-fields input:nth-child(2) { color: #7d838f; font-size: 8px; }
+.rundown-fields input::placeholder,
+.rundown-time-input::placeholder { color: #b3b7c0; }
+.rundown-fields input:focus,
+.rundown-time-input:focus { border-color: #b8b2ed; background: #fff; box-shadow: 0 0 0 3px #f1efff; }
+.rundown-time-input { width: 58px; flex: 0 0 58px; text-align: center; font-size: 8px; }
+.rundown-remove { border: 0; background: transparent; color: #b8bcc5; cursor: pointer; padding: 2px; }
+.rundown-remove:hover { color: #c4644a; }
+
+/* Readiness is reported, not ticked. See the note in LessonPlanner.tsx. */
+.prep-check > .prep-fact {
+  width: calc(100% - 26px); min-height: 33px; display: flex; align-items: center;
+  gap: 8px; margin: 0 13px; color: #697080; font-size: 8.5px;
+}
+.prep-check > .prep-fact svg { flex: 0 0 auto; color: #b5b8c1; }
+.prep-check > .prep-fact.done svg { color: var(--mint); }
+
+/* ---------------------------------------------------------------- */
+/* Homework checking                                                 */
+/* ---------------------------------------------------------------- */
+
+.checking-workspace {
+  display: grid; grid-template-columns: minmax(240px, .62fr) minmax(340px, 1.38fr);
+  gap: 15px; align-items: start;
+}
+.checking-queue, .checking-pane { overflow: hidden; }
+.checking-list { display: flex; flex-direction: column; padding-bottom: 6px; }
+.checking-row {
+  width: 100%; min-height: 58px; display: flex; align-items: center; gap: 9px;
+  padding: 9px 15px; border: 0; border-top: 1px solid #f0f0f2;
+  background: #fff; text-align: left; cursor: pointer; transition: .15s ease;
+}
+.checking-row:hover { background: #fafafd; }
+.checking-row.is-selected { background: var(--violet-soft); }
+.checking-row-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.checking-row-copy strong { font-size: 9.5px; }
+.checking-row-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #979ca8; font-size: 8px; }
+.checking-row em {
+  display: flex; align-items: center; gap: 3px; padding: 4px 6px; border-radius: 6px;
+  color: #7f8592; background: #f5f5f7; font-size: 7.5px; font-style: normal; white-space: nowrap;
+}
+.checking-row em.is-blocking { color: #a56225; background: var(--amber-soft); }
+
+.checking-body { padding: 0 17px 4px; }
+.checking-label { display: block; margin-bottom: 6px; color: #777e8d; font-size: 8.5px; font-weight: 620; }
+.checking-submission {
+  max-height: 220px; overflow-y: auto; margin-bottom: 15px;
+  padding: 12px 13px; border: 1px solid #ececf0; border-radius: 9px;
+  background: #fafafa; color: #4c5362; font-size: 9.5px; line-height: 1.65;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.checking-submission.is-empty { color: #9a9fab; font-style: italic; }
+/* The pane's form is already inside .checking-body's padding. */
+.checking-body .workflow-form { padding: 0 0 13px; }
+
+/* ---------------------------------------------------------------- */
+/* Responsive                                                        */
+/* ---------------------------------------------------------------- */
+
+@media (max-width: 1140px) {
+  .checking-workspace { grid-template-columns: 1fr; }
+  .score-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 620px) {
+  .workflow-entry-slot { max-width: none; }
+  .planner-lesson-select { max-width: 140px; }
+}

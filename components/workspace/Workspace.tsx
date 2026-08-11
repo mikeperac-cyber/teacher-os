@@ -33,7 +33,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Circle,
   Clock3,
   Command,
   FileCheck2,
@@ -58,7 +57,6 @@ import {
   UserRound,
   Users,
   Video,
-  WandSparkles,
   X,
 } from "lucide-react";
 import { EmptyState, PanelHeader } from "@/components/primitives";
@@ -67,6 +65,10 @@ import {
   ESLDashboard,
   IELTSDashboard,
 } from "@/components/dashboard/TrackDashboards";
+import { HomeworkChecking } from "@/components/homework/HomeworkChecking";
+import { LessonPlanner } from "@/components/planner/LessonPlanner";
+import { EslProgressEntry } from "@/components/progress/EslProgressEntry";
+import { IeltsBandEntry } from "@/components/progress/IeltsBandEntry";
 import type { RecordKind } from "@/lib/actions/create-record";
 import { signOutAction } from "@/lib/auth/actions";
 import { areaMetaFor } from "@/lib/content/area-meta";
@@ -74,8 +76,6 @@ import { areaFromSlug, areaSlug } from "@/lib/navigation/areas";
 import { buildDestination } from "@/lib/navigation/destination";
 import { sharedNavGroups, trackNavGroups } from "@/lib/navigation/nav-config";
 import {
-  HOMEWORK_COLUMN_LABELS,
-  HOMEWORK_COLUMNS,
   activeLessonPlanByTrack,
   calendarEvents,
   cefrDistribution,
@@ -84,7 +84,6 @@ import {
   eslProgressRows,
   eslStudents,
   goals,
-  homeworkBoardByTrack,
   ieltsBandRows,
   ieltsCandidates,
   ieltsSpeakingRows,
@@ -107,7 +106,7 @@ import {
   writingErrorPatterns,
 } from "@/lib/fixtures";
 import { ESL_SKILL_LABELS } from "@/lib/types/domain";
-import type { HomeworkBoard, HomeworkColumn } from "@/lib/types/domain";
+import type { StudentSignal } from "@/lib/types/domain";
 import type { ShellUser } from "@/lib/types/auth";
 import type { DeepLink, TriageData } from "@/lib/types/dashboard";
 import type { Announce, Area, DestinationPanel, Track } from "@/lib/types/ui";
@@ -468,7 +467,14 @@ export function Workspace({
               />
             )
           ) : (
-            <AreaPreview area={activeArea} track={activeTrack} announce={announce} />
+            <AreaPreview
+              area={activeArea}
+              track={activeTrack}
+              workspaceId={workspaceId}
+              triage={triage}
+              nowIso={nowIso}
+              announce={announce}
+            />
           )}
         </main>
       </div>
@@ -914,15 +920,31 @@ function GlobalSearch({
 /* Areas                                                               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The live data an area screen may need.
+ *
+ * Passed as one object rather than four props threaded through two components,
+ * because the areas that write records all need the same three things: which
+ * workspace, what is already there, and the request's `now`.
+ */
+type AreaData = {
+  workspaceId: string | null;
+  triage: TriageData;
+  nowIso: string;
+};
+
 function AreaPreview({
   area,
   track,
+  workspaceId,
+  triage,
+  nowIso,
   announce,
 }: {
   area: Exclude<Area, "Dashboard">;
   track: Track;
   announce: Announce;
-}) {
+} & AreaData) {
   const meta = areaMetaFor(track, area);
   if (!meta) return null;
   return (
@@ -940,7 +962,14 @@ function AreaPreview({
           <Plus size={16} /> New
         </button>
       </section>
-      <DetailedArea area={area} track={track} announce={announce} />
+      <DetailedArea
+        area={area}
+        track={track}
+        workspaceId={workspaceId}
+        triage={triage}
+        nowIso={nowIso}
+        announce={announce}
+      />
     </>
   );
 }
@@ -948,12 +977,15 @@ function AreaPreview({
 function DetailedArea({
   area,
   track,
+  workspaceId,
+  triage,
+  nowIso,
   announce,
 }: {
   area: Exclude<Area, "Dashboard">;
   track: Track;
   announce: Announce;
-}) {
+} & AreaData) {
   switch (area) {
     case "Today":
       return <TodayArea track={track} />;
@@ -966,15 +998,41 @@ function DetailedArea({
     case "Lessons":
       return <LessonsArea track={track} announce={announce} />;
     case "Lesson Planner":
-      return <LessonPlannerArea track={track} announce={announce} />;
+      return (
+        <LessonPlanner
+          track={track}
+          workspaceId={workspaceId}
+          lessons={triage.upcomingLessons}
+          now={new Date(nowIso)}
+        />
+      );
     case "Homework":
-      return <HomeworkArea track={track} announce={announce} />;
+      return (
+        <HomeworkChecking
+          track={track}
+          workspaceId={workspaceId}
+          submissions={triage.pendingHomework}
+          now={new Date(nowIso)}
+        />
+      );
     case "Assessments":
       return <AssessmentsArea track={track} announce={announce} />;
     case "ESL Progress":
-      return <ESLProgressArea announce={announce} />;
+      return (
+        <ESLProgressArea
+          announce={announce}
+          workspaceId={workspaceId}
+          students={triage.studentSignals}
+        />
+      );
     case "IELTS Progress":
-      return <IELTSProgressArea announce={announce} />;
+      return (
+        <IELTSProgressArea
+          announce={announce}
+          workspaceId={workspaceId}
+          students={triage.studentSignals}
+        />
+      );
     case "Language Skills":
       return <LanguageSkillsArea announce={announce} />;
     case "Writing Tracker":
@@ -1353,176 +1411,6 @@ function LessonsArea({ track, announce }: { track: Track; announce: Announce }) 
   );
 }
 
-function LessonPlannerArea({ track, announce }: { track: Track; announce: Announce }) {
-  const plan = activeLessonPlanByTrack[track];
-  const [prepChecks, setPrepChecks] = useState([false, false, false, false]);
-
-  if (!plan) {
-    return (
-      <section className="planner-workspace">
-        <article className="panel planner-brief">
-          <PanelHeader kicker={`${track} lesson brief`} title="No lesson to prepare" />
-          <EmptyState
-            icon={NotebookPen}
-            title="Nothing scheduled"
-            hint={
-              track === "ESL"
-                ? "Schedule an ESL lesson to plan from a CEFR outcome."
-                : "Schedule an IELTS lesson to plan from a target band and rubric gap."
-            }
-          />
-        </article>
-      </section>
-    );
-  }
-
-  return (
-    <section className="planner-workspace">
-      <article className="panel planner-brief">
-        <PanelHeader kicker={`${track} lesson brief`} title={plan.student} />
-        <div className="planner-form">
-          <label>
-            <span>
-              {track === "ESL" ? "CEFR learning outcome" : "Band-score objective"}
-            </span>
-            <textarea defaultValue={plan.objective} />
-          </label>
-          <div className="form-row">
-            <label>
-              <span>Course</span>
-              <input defaultValue={plan.course} />
-            </label>
-            <label>
-              <span>{track === "ESL" ? "Language focus" : "Skill / task"}</span>
-              <input defaultValue={plan.skill} />
-            </label>
-          </div>
-          <button
-            className="ai-plan-button"
-            onClick={() => announce(`${track} lesson suggestions refreshed`)}
-          >
-            <WandSparkles size={16} /> Suggest from{" "}
-            {track === "ESL" ? "CEFR gaps" : "recent rubric gaps"}
-          </button>
-        </div>
-      </article>
-      <article className="panel lesson-rundown">
-        <PanelHeader
-          kicker={track === "ESL" ? "ESA-aligned rundown" : "Score-focused rundown"}
-          title="60-minute lesson flow"
-        />
-        <div className="rundown-list">
-          {plan.blocks.map((block, index) => (
-            <div className="rundown-row" key={`${block.time}-${index}`}>
-              <span className={`rundown-index ${block.tone}`}>
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <div>
-                <strong>{block.title}</strong>
-                <small>{block.detail}</small>
-              </div>
-              <span className="rundown-time">{block.time} min</span>
-            </div>
-          ))}
-        </div>
-      </article>
-      <aside className="planner-resources">
-        <article className="panel prep-check">
-          <PanelHeader kicker="Pre-class" title="Readiness check" />
-          {[
-            "Homework reviewed",
-            track === "ESL" ? "CEFR outcome is observable" : "Rubric gap is explicit",
-            track === "ESL" ? "Production task prepared" : "Model paragraph finalized",
-            "Shared board opened",
-          ].map((label, index) => (
-            <button
-              key={label}
-              className={prepChecks[index] ? "done" : ""}
-              onClick={() =>
-                setPrepChecks((items) =>
-                  items.map((value, itemIndex) =>
-                    itemIndex === index ? !value : value,
-                  ),
-                )
-              }
-            >
-              {prepChecks[index] ? <Check size={13} /> : <Circle size={13} />} {label}
-            </button>
-          ))}
-          <div className="prep-score">
-            <span>{track} lesson readiness</span>
-            <strong>
-              {Math.round((prepChecks.filter(Boolean).length / 4) * 100)}%
-            </strong>
-          </div>
-        </article>
-      </aside>
-    </section>
-  );
-}
-
-function HomeworkArea({ track, announce }: { track: Track; announce: Announce }) {
-  const [board, setBoard] = useState<HomeworkBoard>(homeworkBoardByTrack[track]);
-
-  const advance = (column: HomeworkColumn, id: number) => {
-    const index = HOMEWORK_COLUMNS.indexOf(column);
-    const item = board[column].find((entry) => entry.id === id);
-    if (!item) return;
-    if (index === HOMEWORK_COLUMNS.length - 1) {
-      announce(`${item.name} ${track} homework record opened`);
-      return;
-    }
-    const nextColumn = HOMEWORK_COLUMNS[index + 1];
-    setBoard({
-      ...board,
-      [column]: board[column].filter((entry) => entry.id !== id),
-      [nextColumn]: [...board[nextColumn], item],
-    });
-  };
-
-  return (
-    <section className="homework-board">
-      {HOMEWORK_COLUMNS.map((column) => (
-        <article className="homework-column" key={column}>
-          <div className="homework-column-head">
-            <span className={`column-dot ${column}`} />
-            <strong>{HOMEWORK_COLUMN_LABELS[column]}</strong>
-            <b>{board[column].length}</b>
-          </div>
-          <div className="homework-cards">
-            {board[column].map((item) => (
-              <button
-                key={item.id}
-                className="homework-card"
-                onClick={() => advance(column, item.id)}
-              >
-                <div>
-                  <span className={`avatar avatar-small avatar-${item.tone}`}>
-                    {item.name
-                      .split(" ")
-                      .map((part) => part[0])
-                      .join("")}
-                  </span>
-                </div>
-                <h3>{item.task}</h3>
-                <p>
-                  {item.name} · {track}
-                </p>
-                <footer>
-                  <span className={item.due.includes("Late") ? "late" : ""}>
-                    <Clock3 size={13} />
-                    {item.due}
-                  </span>
-                </footer>
-              </button>
-            ))}
-          </div>
-        </article>
-      ))}
-    </section>
-  );
-}
-
 function AssessmentsArea({ track, announce }: { track: Track; announce: Announce }) {
   const queue = markingQueueByTrack[track];
   return (
@@ -1597,7 +1485,15 @@ function AssessmentsArea({ track, announce }: { track: Track; announce: Announce
   );
 }
 
-function ESLProgressArea({ announce }: { announce: Announce }) {
+function ESLProgressArea({
+  announce,
+  workspaceId,
+  students,
+}: {
+  announce: Announce;
+  workspaceId: string | null;
+  students: StudentSignal[];
+}) {
   return (
     <section className="progress-workspace">
       <article className="panel progress-matrix">
@@ -1658,6 +1554,7 @@ function ESLProgressArea({ announce }: { announce: Announce }) {
         )}
       </article>
       <aside className="progress-side">
+        <EslProgressEntry workspaceId={workspaceId} students={students} />
         <article className="panel cefr-distribution">
           <PanelHeader kicker="Level mix" title="CEFR distribution" />
           <div className="level-bars">
@@ -1677,7 +1574,15 @@ function ESLProgressArea({ announce }: { announce: Announce }) {
   );
 }
 
-function IELTSProgressArea({ announce }: { announce: Announce }) {
+function IELTSProgressArea({
+  announce,
+  workspaceId,
+  students,
+}: {
+  announce: Announce;
+  workspaceId: string | null;
+  students: StudentSignal[];
+}) {
   return (
     <section className="ielts-workspace">
       <article className="panel ielts-matrix">
@@ -1736,6 +1641,11 @@ function IELTSProgressArea({ announce }: { announce: Announce }) {
           />
         )}
       </article>
+      {/* The matrix is full-width; a form at that width reads as a wall of
+          fields, so the entry panel is constrained to a readable column. */}
+      <div className="workflow-entry-slot">
+        <IeltsBandEntry workspaceId={workspaceId} students={students} />
+      </div>
     </section>
   );
 }
