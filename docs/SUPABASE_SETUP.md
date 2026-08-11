@@ -1,11 +1,30 @@
 # Connecting a Supabase project
 
-The schema is written and tested, but no Supabase project exists yet. Creating
-one needs your account, so these are the steps for you rather than for Claude.
+**Status: `teacher-os-dev` is connected and all 10 migrations are applied**
+(11 August 2026, eu-north-1, Postgres 17.6). The steps below remain accurate for
+creating the production project, or for rebuilding dev from scratch.
 
-Nothing in the application reads these variables yet — that lands with the
-client wiring in the next phase. Doing this first means the migrations can be
-applied and verified against a real project before any code depends on them.
+## What was verified against the real service
+
+Things PGlite could not prove, confirmed by a full round trip on the live
+project:
+
+| Check | Result |
+| --- | --- |
+| All 10 migrations apply cleanly | yes |
+| Anonymous reads (7 tables) | 0 rows from every one |
+| Storage buckets | all 4 created, all private |
+| `handle_new_user` trigger | fires on signup, creates the profile |
+| Sign in with the publishable key | works |
+| `create_student` RPC through RLS | works for an owner, refused for anon |
+| Schedule lesson, assign homework | work for an owner |
+| Owner submitting for a learner | **refused, 42501** — see CURRENT_STATE.md |
+
+**PostgREST returns one-to-one embeds as objects, not arrays.** Confirmed for
+`lessons.lesson_plans`, `homework_submissions.homework_feedback` and
+`students.ielts_student_profiles`. `lib/queries/mappers.ts` handles both shapes
+through `firstOf`; indexing `[0]` — which the code did before the audit — would
+have left the action inbox permanently empty.
 
 ## 1. Create two projects
 
@@ -40,6 +59,9 @@ Vercel's encrypted environment variables, never in a client component, never in
 ```bash
 npx supabase link --project-ref <your-dev-project-ref>
 ```
+
+The CLI did not ask for a database password — an existing `supabase login`
+session was enough.
 
 ```bash
 npx supabase db push

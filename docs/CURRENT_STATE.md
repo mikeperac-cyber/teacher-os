@@ -1,6 +1,6 @@
 # Current state
 
-Last updated 11 August 2026.
+Last updated 11 August 2026, after connecting the dev Supabase project.
 
 For the original export's state, see `git show 294b548` and the version of this
 file at that commit.
@@ -52,17 +52,17 @@ tests/              Vitest — 173 tests, including 62 against a real Postgres
 
 ## What is not built yet
 
-- **No Supabase project provisioned.** The schema, policies and client wiring
-  all exist and are tested, but nobody has created the project yet — that needs
-  Mike's account. See `SUPABASE_SETUP.md`.
-
-  Until then the app runs in a deliberate "unconfigured" state: it starts, every
-  screen renders, and the sidebar says *Not connected* rather than pretending
-  someone is signed in. `isSupabaseConfigured` is checked before any client is
-  built, so nothing throws.
-- **No data**, because there is no project to hold any. The dashboard now reads
-  through `lib/queries/triage.ts` rather than fixtures, and returns empty until
-  a project exists.
+- **No production project.** `teacher-os-dev` exists and all 10 migrations are
+  applied to it (verified 11 August 2026 — see `SUPABASE_SETUP.md`). Production
+  is not provisioned, and must be on a paid tier before any real student record
+  is entered.
+- **No data yet.** The dashboard reads through `lib/queries/triage.ts` and
+  returns empty until learners are created.
+- **A teacher cannot record a submission on a learner's behalf.** Only the
+  learner may insert into `homework_submissions`. That is what the policy says
+  and the round trip confirmed it (`42501`). It is a deliberate boundary, but it
+  means paper homework, or work a learner emails over, currently has nowhere to
+  go. Needs a product decision before a staff INSERT policy is added.
 - **Four of the eight workflow steps have no screen yet.** Creating a learner,
   scheduling a lesson and assigning homework all write for real from the quick
   actions. Lesson preparation, student submission, feedback and progress entry

@@ -40,3 +40,6 @@ next-env.d.ts
 
 # local browser-automation scratch output
 /.playwright-mcp/
+
+# Supabase CLI local link state (contains project ref + cached metadata)
+/supabase/.temp/
