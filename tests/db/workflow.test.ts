@@ -87,6 +87,73 @@ afterAll(async () => {
 });
 
 /**
+ * Onboarding, which was a complete dead end before migration 0011.
+ *
+ * A newly signed-up user could not create a workspace: `INSERT ... RETURNING`
+ * applied a SELECT policy that required membership they did not have, and the
+ * follow-up membership insert required `is_workspace_owner`, which reads the
+ * table still being written. Sign-up worked and then nothing else did.
+ *
+ * Found by trying to use the product against the real project, not by reading.
+ */
+describe("create_workspace", () => {
+  it("lets a brand-new user set themselves up", async () => {
+    const newUser = await (async () => {
+      const { rows } = await db.sql(
+        `insert into auth.users (email) values ('fresh@example.test') returning id`,
+      );
+      return (rows[0] as { id: string }).id;
+    })();
+
+    const rows = (await writeAs(
+      db,
+      newUser,
+      `select public.create_workspace('Fresh Teaching') as id`,
+    )) as { id: string }[];
+
+    expect(rows[0].id).toBeTruthy();
+
+    // They can see it, and they are its owner.
+    const visible = await queryAs(
+      db,
+      newUser,
+      `select name from public.workspaces`,
+    );
+    expect(visible).toEqual([{ name: "Fresh Teaching" }]);
+
+    const membership = await queryAs(
+      db,
+      newUser,
+      `select role from public.workspace_members`,
+    );
+    expect(membership).toEqual([{ role: "owner" }]);
+  });
+
+  it("refuses a second workspace, which would be unreachable", async () => {
+    await expect(
+      writeAs(
+        db,
+        ids.owner,
+        `select public.create_workspace('Another') as id`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("refuses a blank name", async () => {
+    const { rows } = await db.sql(
+      `insert into auth.users (email) values ('blank@example.test') returning id`,
+    );
+    await expect(
+      writeAs(
+        db,
+        (rows[0] as { id: string }).id,
+        `select public.create_workspace('   ') as id`,
+      ),
+    ).rejects.toThrow();
+  });
+});
+
+/**
  * Regression guard for a bug this suite found.
  *
  * `INSERT ... RETURNING` applies the SELECT policy to the row it returns. When

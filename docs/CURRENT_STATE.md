@@ -28,8 +28,8 @@ lib/types/          domain.ts is the contract the Supabase schema derives from
 lib/queries/        server-side reads; return the exact shapes the fixtures did
 lib/fixtures/       the remaining seam; being replaced by queries one module at a time
 lib/actions/        write path, shaped like the server action it will become
-supabase/migrations/ 10 migrations, 27 tables, RLS on every one
-tests/              Vitest — 173 tests, including 62 against a real Postgres
+supabase/migrations/ 11 migrations, 27 tables, RLS on every one
+tests/              Vitest — 176 tests, including 65 against a real Postgres
 ```
 
 ## What works
@@ -47,6 +47,8 @@ tests/              Vitest — 173 tests, including 62 against a real Postgres
 
 - Sign in, sign up, sign out, and email confirmation, in the existing visual
   language.
+- Self-service onboarding: a new user names their workspace and becomes its
+  owner, without anyone touching SQL.
 - A session resolved on the server and passed into the shell as a prop, so the
   browser is never asked who the user is.
 
@@ -95,5 +97,5 @@ tests/              Vitest — 173 tests, including 62 against a real Postgres
 npm run verify
 ```
 
-Type checking, lint, 173 tests and a production build. All green as of this
+Type checking, lint, 176 tests and a production build. All green as of this
 commit.

@@ -185,3 +185,38 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-submit, .auth-form input { transition: none; }
 }
+
+/* Onboarding: creating a first workspace. */
+.create-workspace-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.create-workspace-form label { display: flex; flex-direction: column; gap: 5px; }
+.create-workspace-form label > span {
+  font-size: 10px;
+  font-weight: 640;
+  color: #656c7c;
+}
+
+.create-workspace-form input {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid var(--line, #e6e6ea);
+  border-radius: 9px;
+  background: #fcfcfd;
+  color: var(--ink, #1b2030);
+  font-size: 12.5px;
+}
+
+.create-workspace-form input:focus {
+  outline: none;
+  border-color: var(--violet, #6558d7);
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--violet-soft, #eeecff);
+}
+
+.create-workspace-form .primary-button { justify-content: center; height: 38px; }
+.create-workspace-form .primary-button:disabled { opacity: .65; cursor: progress; }

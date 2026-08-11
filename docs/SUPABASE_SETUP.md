@@ -101,24 +101,17 @@ as an address they do not control.
 
 ## 6. Create the first workspace
 
-The signup trigger creates a profile automatically, but a new user belongs to no
-workspace and will therefore see nothing — correctly, since every policy is
-scoped by membership.
+Nothing to do by hand. Sign up at `/sign-up`, and the app asks you to name your
+workspace on first sign-in.
 
-Until the owner-onboarding flow exists, create the first workspace by hand in
-the SQL editor:
+Earlier revisions of this file told you to insert two rows in the SQL editor,
+because a user genuinely could not create a workspace themselves — see
+`0011_create_workspace.sql` for the deadlock that caused. That is fixed; the
+onboarding screen calls `public.create_workspace`, which writes the workspace
+and the owner membership atomically.
 
-```sql
-insert into public.workspaces (name, owner_id)
-values ('My teaching', '<your auth user id>')
-returning id;
-
-insert into public.workspace_members (workspace_id, user_id, role)
-values ('<the workspace id>', '<your auth user id>', 'owner');
-```
-
-Both rows are required. A workspace whose owner has no membership row is
-invisible to its own owner.
+One workspace per owner for now. A second is refused rather than created
+unreachable, since there is no workspace switcher in the interface yet.
 
 ## What comes next
 

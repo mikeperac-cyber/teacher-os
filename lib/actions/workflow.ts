@@ -497,3 +497,35 @@ export async function recordIeltsBands(input: {
   revalidatePath("/");
   return { ok: true, data: { recorded: entries.length } };
 }
+
+/* ------------------------------------------------------------------ */
+/* 0. Workspace bootstrap                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Creates the caller's first workspace and makes them its owner.
+ *
+ * Goes through `public.create_workspace` because the two rows must land
+ * together, and because a signed-in user with no membership cannot write either
+ * of them directly — see supabase/migrations/0011_create_workspace.sql for why
+ * that deadlock existed.
+ */
+export async function createWorkspace(
+  name: string,
+): Promise<ActionResult<{ workspaceId: string }>> {
+  if (!name.trim()) {
+    return { ok: false, error: "Give your workspace a name.", field: "name" };
+  }
+
+  const context = await client();
+  if (!context) return { ok: false, error: NOT_CONNECTED };
+
+  const { data, error } = await context.supabase.rpc("create_workspace", {
+    p_name: name.trim(),
+  });
+
+  if (error) return { ok: false, error: describeError(error) };
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: { workspaceId: data as string } };
+}

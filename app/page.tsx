@@ -13,9 +13,7 @@
  * in Postgres (see tests/db/rls.test.ts).
  */
 
-import { UserRound } from "lucide-react";
-import Link from "next/link";
-
+import { CreateWorkspace } from "@/components/auth/CreateWorkspace";
 import { Workspace } from "@/components/workspace/Workspace";
 import { getSession } from "@/lib/auth/session";
 import { getTriageData } from "@/lib/queries/triage";
@@ -40,24 +38,7 @@ export default async function WorkspacePage() {
   if (session.status === "no-workspace") {
     return (
       <div className="no-workspace-shell">
-        <div className="no-workspace-card">
-          <span className="no-workspace-icon">
-            <UserRound size={21} />
-          </span>
-          <h1>You are not in a workspace yet</h1>
-          <p>
-            Your account exists, but it has not been added to a teaching
-            workspace. An owner needs to invite you before there is anything to
-            see.
-          </p>
-          <p>
-            Setting this up for the first time? <code>docs/SUPABASE_SETUP.md</code>{" "}
-            covers creating the first workspace.
-          </p>
-          <Link className="primary-button" href="/sign-in">
-            Back to sign in
-          </Link>
-        </div>
+        <CreateWorkspace displayName={session.displayName} />
       </div>
     );
   }
