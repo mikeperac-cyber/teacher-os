@@ -15,9 +15,19 @@ reference only. Do not reconnect this repository to that deployment.
 - URL-aware navigation: `?track=esl|ielts&view=<area>&detail=<slug>`.
 - The dashboard is a triage surface — next lesson, what is blocking it, a
   merged action queue and at-risk learners.
-- **No database and no authentication yet.** Every collection resolves through
-  `lib/fixtures/`, which currently returns empty, so every screen renders its
-  empty state. That is the correct state for a workspace with no records.
+- **Supabase Postgres, Auth and Storage**, with 11 SQL migrations, 27 tables and
+  Row Level Security on every one. Authorization lives in the database, not in
+  hidden UI.
+- **Sign in, sign up and self-service onboarding.** The session is resolved on
+  the server and passed into the shell as a prop; the browser is never asked who
+  the user is.
+- **Most of the teaching workflow writes real records**: create a learner,
+  schedule a lesson, prepare it, assign homework, check homework and give
+  feedback, and record progress — CEFR mastery for ESL, band scores for IELTS.
+
+Not built yet: the student portal, so a learner cannot submit their own work; and
+several area screens are structure without data. See
+[docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) for the honest list.
 
 Read [CLAUDE.md](CLAUDE.md), [docs/adr/0001-production-runtime-and-database.md](docs/adr/0001-production-runtime-and-database.md)
 and the rest of [docs](docs) before making changes.
@@ -36,13 +46,18 @@ and the rest of [docs](docs) before making changes.
 
 | Path | Contents |
 | --- | --- |
-| `app/` | Route, layout and the two stylesheets |
+| `app/` | Route, auth screens, layout and four stylesheets |
 | `components/dashboard/` | Triage panels — next-up lesson, action inbox, at-risk, capacity, goals, quick actions |
+| `components/planner/` | Lesson preparation — brief, rundown, readiness |
+| `components/homework/` | Homework checking — queue and marking pane |
+| `components/progress/` | Two progress-entry forms, one per track, deliberately not shared |
 | `lib/dashboard/` | The triage rules. Pure functions taking `now` explicitly, so thresholds are reviewable and testable |
 | `lib/types/` | `domain.ts` is the field-level contract the Supabase schema is derived from |
-| `lib/fixtures/` | The data seam. Empty today; replaced by queries one module at a time |
-| `lib/actions/` | Write path. Has the shape a server action will take |
-| `tests/` | Vitest suites over the rules and the create flow |
+| `lib/queries/` | Server-side reads. `mappers.ts` is pure and tested; `triage.ts` is `server-only` |
+| `lib/actions/` | Server actions. Authorization is not here — every write goes through RLS |
+| `lib/supabase/` | Browser, server and admin clients. The service-role key never reaches a client bundle |
+| `supabase/migrations/` | 11 migrations, 27 tables, RLS policies and the SECURITY DEFINER helpers |
+| `tests/` | Vitest — 210 tests, 65 of them against a real Postgres via PGlite |
 
 ## Start locally
 
@@ -52,6 +67,14 @@ Node.js 22.13 or newer. No WSL required.
 npm install
 npm run dev
 ```
+
+The app runs without a database — it shows the sign-in screen and says plainly
+that no project is connected, rather than presenting a form that cannot work.
+
+To run it against your own Supabase project, copy `.env.example` to `.env.local`
+and follow [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md), which covers
+applying the migrations and verifying RLS. **No key belongs in this repository** —
+`.env*` is ignored, and `SUPABASE_SERVICE_ROLE_KEY` is server-only.
 
 ## Verify
 

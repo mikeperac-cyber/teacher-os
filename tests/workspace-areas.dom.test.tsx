@@ -49,9 +49,9 @@ vi.mock("@/lib/auth/actions", () => ({
 const NOW = new Date(2026, 7, 10, 9, 0, 0);
 
 const SHELL_USER = {
-  displayName: "Mike",
-  initials: "M",
-  subtitle: "Owner · MySchool",
+  displayName: "Test Teacher",
+  initials: "TT",
+  subtitle: "Owner · Test Workspace",
   signedIn: true,
 };
 
