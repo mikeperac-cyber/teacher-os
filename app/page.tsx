@@ -14,8 +14,10 @@
  */
 
 import { CreateWorkspace } from "@/components/auth/CreateWorkspace";
+import { StudentPortal } from "@/components/student/StudentPortal";
 import { Workspace } from "@/components/workspace/Workspace";
 import { getSession } from "@/lib/auth/session";
+import { getStudentSnapshot } from "@/lib/queries/student";
 import { getTriageData } from "@/lib/queries/triage";
 import { shellUserFrom } from "@/lib/types/auth";
 
@@ -40,6 +42,24 @@ export default async function WorkspacePage() {
       <div className="no-workspace-shell">
         <CreateWorkspace displayName={session.displayName} />
       </div>
+    );
+  }
+
+  // The role-aware split. A learner gets their own portal, which asks three
+  // questions — what do I owe, when is my next class, how am I doing — rather
+  // than the teaching workspace with most of it hidden.
+  //
+  // Rendering only. A student who forced their way to the teaching shell would
+  // still read nothing, because every policy is keyed on who they are, not on
+  // which component rendered.
+  if (session.status === "active" && session.role === "student") {
+    const snapshot = await getStudentSnapshot(now);
+    return (
+      <StudentPortal
+        snapshot={snapshot}
+        displayName={session.displayName}
+        nowIso={now.toISOString()}
+      />
     );
   }
 

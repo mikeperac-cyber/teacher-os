@@ -90,7 +90,8 @@ export async function getTriageData(now: Date): Promise<TriageData> {
       .from("students")
       .select(
         `id, full_name, track,
-         ielts_student_profiles ( target_band, test_date )`,
+         ielts_student_profiles ( target_band, test_date ),
+         student_accounts ( user_id )`,
       )
       .eq("status", "active"),
 

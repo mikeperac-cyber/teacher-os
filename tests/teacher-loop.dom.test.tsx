@@ -114,6 +114,7 @@ const student = (over: Partial<StudentSignal> = {}): StudentSignal => ({
   lastActiveAt: null,
   missedHomework: 0,
   lastProgressAt: null,
+  hasLogin: false,
   ...over,
 });
 

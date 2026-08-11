@@ -173,6 +173,7 @@ export type StudentQueryRow = {
   full_name: string;
   track: DbTrack;
   ielts_student_profiles?: unknown;
+  student_accounts?: unknown;
   last_active_at?: string | null;
   missed_homework?: number | null;
   last_progress_at?: string | null;
@@ -193,6 +194,10 @@ export function mapStudentSignal(row: StudentQueryRow): StudentSignal {
     lastActiveAt: row.last_active_at ?? null,
     missedHomework: row.missed_homework ?? 0,
     lastProgressAt: row.last_progress_at ?? null,
+    // `student_accounts` is one-to-one (unique on student_id), so PostgREST
+    // returns an object rather than an array — the shape trap from the top of
+    // this file, which is why this goes through `firstOf` too.
+    hasLogin: firstOf<{ user_id: string }>(row.student_accounts) !== null,
     // `undefined` rather than null: the at-risk rules use `!== undefined` to
     // decide whether a target band is known at all.
     targetBand: ielts?.target_band ?? undefined,

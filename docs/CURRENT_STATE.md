@@ -1,6 +1,6 @@
 # Current state
 
-Last updated 11 August 2026, after building the teacher loop.
+Last updated 11 August 2026, after building the student portal.
 
 For the original export's state, see `git show 294b548` and the version of this
 file at that commit.
@@ -24,6 +24,8 @@ components/         primitives, dashboard triage panels, auth form, workspace sh
   planner/          lesson preparation — brief, rundown, readiness
   homework/         homework checking — queue and marking pane
   progress/         two entry forms, one per track, deliberately not shared
+  students/         owner panel for granting and revoking portal access
+  student/          the learner's own shell — a different product, not a filter
 lib/supabase/       browser / server / admin clients, and `isSupabaseConfigured`
 lib/auth/           session resolution and the sign-in/up/out server actions
 lib/dashboard/      triage rules — pure functions, every one takes `now` explicitly
@@ -31,8 +33,8 @@ lib/types/          domain.ts is the contract the Supabase schema derives from
 lib/queries/        server-side reads; return the exact shapes the fixtures did
 lib/fixtures/       the remaining seam; being replaced by queries one module at a time
 lib/actions/        write path, shaped like the server action it will become
-supabase/migrations/ 11 migrations, 27 tables, RLS on every one
-tests/              Vitest — 210 tests, including 65 against a real Postgres
+supabase/migrations/ 12 migrations, 27 tables, RLS on every one
+tests/              Vitest — 260 tests, including 83 against a real Postgres
 ```
 
 ## What works
@@ -57,6 +59,11 @@ tests/              Vitest — 210 tests, including 65 against a real Postgres
   percentages for ESL, half-band selects for IELTS. Both can record privately or
   share with the learner. Skills left blank are not sent — an unobserved skill is
   not a zero.
+- **The student portal.** A learner signs up themselves, the owner links that
+  email address to their learner record, and they get their own shell: what they
+  owe, when their next class is, and how they are doing. They can save a draft
+  or send it, and they read feedback and progress only once the teacher has
+  released it. This completes the eight-step vertical slice in CLAUDE.md.
 - Per-area filtering and sorting within a session.
 - Every screen has a designed empty state.
 
@@ -80,15 +87,15 @@ tests/              Vitest — 210 tests, including 65 against a real Postgres
   and the round trip confirmed it (`42501`). It is a deliberate boundary, but it
   means paper homework, or work a learner emails over, currently has nowhere to
   go. Needs a product decision before a staff INSERT policy is added.
-- **One of the eight workflow steps still has no screen: student submission.**
-  Everything the teacher does now has a form. `submitHomework` is implemented in
-  `lib/actions/workflow.ts` and proven against a real Postgres in
-  `tests/db/workflow.test.ts`, but the learner has nowhere to submit from — see
-  "No student shell" below.
-
-  Recording an assessment is the one quick action with no form, because it needs
-  a set of criteria to score against and those differ per track. It says so
-  rather than showing a form that cannot succeed.
+- **All eight workflow steps now have a screen.** The one quick action still
+  without a form is recording an assessment, because it needs a set of criteria
+  to score against and those differ per track. It says so rather than showing a
+  form that cannot succeed.
+- **A learner cannot create their own account from an invitation.** They sign up
+  at `/sign-up` like anyone else, and the owner then links the address. Doing it
+  the other way — the teacher creating the account — means the teacher choosing
+  someone else's password, which this application will not do. An emailed invite
+  link is the right fix and needs Supabase's invite flow.
 - **The four-column homework board is not rendered.** `getTriageData` fetches
   only work waiting on the teacher, so a board would show two permanently empty
   columns and imply nothing was ever assigned. `HOMEWORK_COLUMNS`,
@@ -99,10 +106,11 @@ tests/              Vitest — 210 tests, including 65 against a real Postgres
   attached". The field is now `plannedBlocks` and the item reads "Lesson flow
   prepared", which is what it actually measures. A real materials link needs a
   join table and the file-upload path.
-- **No student shell.** Role reaches the interface, but a student currently sees
-  the same layout as a teacher. They would read nothing they should not — RLS
-  refuses it in Postgres — but the screens are not yet built for them.
-- No file upload or download; no email or calendar integration.
+- **The portal has no file upload.** The storage buckets and their policies
+  exist (`0009_storage.sql`), so a learner may already upload to their own
+  submission folder — there is simply no control for it yet. Text-only
+  submissions until there is.
+- No email or calendar integration.
 - Reports and several area screens are structure without data.
 
 ## Cautions carried forward
@@ -116,6 +124,11 @@ tests/              Vitest — 210 tests, including 65 against a real Postgres
 - Releasing is a separate act from saving, for both feedback and progress. A
   screen that always sent `release: true` would make the policy that protects
   half-written feedback unreachable, and nothing would fail loudly.
+- `link_student_account` and `unlink_student_account` are SECURITY DEFINER, so
+  RLS does not run inside them. Their owner check is an explicit `if` in the
+  function body and is the only thing standing between a teacher and every email
+  address in the system. Do not move, weaken or short-circuit it — and if you
+  edit either function, keep `tests/db/student-portal.test.ts` passing.
 - `lib/dashboard/` thresholds are pedagogical judgements. Change them
   deliberately, and update the tests that state them.
 
@@ -125,11 +138,13 @@ tests/              Vitest — 210 tests, including 65 against a real Postgres
 npm run verify
 ```
 
-Type checking, lint, 210 tests and a production build. All green as of this
+Type checking, lint, 260 tests and a production build. All green as of this
 commit.
 
-Two of the new test files were checked against deliberately introduced bugs
-before being trusted: sending `release: true` from the save button, sending `0`
-for unobserved skills, and dropping the `submissions` prop on the way into the
-homework screen. Each was caught. A test that has never failed has not been
-shown to test anything.
+New test files are checked against deliberately introduced bugs before being
+trusted, because a test that has never failed has not been shown to test
+anything. So far: sending `release: true` from the save button, sending `0` for
+unobserved skills, dropping the `submissions` prop on the way into the homework
+screen, removing the owner check from `link_student_account`, rendering
+unreleased feedback in the portal, and letting a learner edit work already sent.
+Each was caught, then reverted.

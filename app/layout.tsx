@@ -7,6 +7,8 @@ import "./dashboard.css";
 import "./auth.css";
 // Lesson preparation, homework checking and progress entry.
 import "./workflow.css";
+// The learner's own portal — a different shell, not the teaching one reskinned.
+import "./student.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });

@@ -499,6 +499,65 @@ export async function recordIeltsBands(input: {
 }
 
 /* ------------------------------------------------------------------ */
+/* 8. Portal access                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Gives a learner access to their own records.
+ *
+ * Goes through `public.link_student_account` because the owner cannot resolve
+ * an email address themselves — `profiles` is not readable for someone who
+ * belongs to no workspace yet, and making it readable would turn every account
+ * into a searchable directory entry. See
+ * supabase/migrations/0012_link_student_account.sql.
+ *
+ * The owner check lives inside that function, not here: it is SECURITY DEFINER,
+ * so RLS does not run and the guard has to be part of the function body.
+ */
+export async function linkStudentAccount(input: {
+  studentId: string;
+  email: string;
+}): Promise<ActionResult<{ userId: string }>> {
+  const email = input.email.trim();
+  if (!email) {
+    return { ok: false, error: "Enter their email address.", field: "email" };
+  }
+  if (!email.includes("@")) {
+    return { ok: false, error: "That does not look like an email address.", field: "email" };
+  }
+
+  const context = await client();
+  if (!context) return { ok: false, error: NOT_CONNECTED };
+
+  const { data, error } = await context.supabase.rpc("link_student_account", {
+    p_student_id: input.studentId,
+    p_email: email,
+  });
+
+  if (error) return { ok: false, error: describeError(error) };
+
+  revalidatePath("/");
+  return { ok: true, data: { userId: data as string } };
+}
+
+/** Revokes portal access. Teaching records are left untouched. */
+export async function unlinkStudentAccount(
+  studentId: string,
+): Promise<ActionResult> {
+  const context = await client();
+  if (!context) return { ok: false, error: NOT_CONNECTED };
+
+  const { error } = await context.supabase.rpc("unlink_student_account", {
+    p_student_id: studentId,
+  });
+
+  if (error) return { ok: false, error: describeError(error) };
+
+  revalidatePath("/");
+  return { ok: true, data: undefined };
+}
+
+/* ------------------------------------------------------------------ */
 /* 0. Workspace bootstrap                                              */
 /* ------------------------------------------------------------------ */
 

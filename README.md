@@ -15,18 +15,22 @@ reference only. Do not reconnect this repository to that deployment.
 - URL-aware navigation: `?track=esl|ielts&view=<area>&detail=<slug>`.
 - The dashboard is a triage surface — next lesson, what is blocking it, a
   merged action queue and at-risk learners.
-- **Supabase Postgres, Auth and Storage**, with 11 SQL migrations, 27 tables and
+- **Supabase Postgres, Auth and Storage**, with 12 SQL migrations, 27 tables and
   Row Level Security on every one. Authorization lives in the database, not in
   hidden UI.
 - **Sign in, sign up and self-service onboarding.** The session is resolved on
   the server and passed into the shell as a prop; the browser is never asked who
   the user is.
-- **Most of the teaching workflow writes real records**: create a learner,
+- **The whole teaching workflow writes real records**: create a learner,
   schedule a lesson, prepare it, assign homework, check homework and give
   feedback, and record progress — CEFR mastery for ESL, band scores for IELTS.
+- **A student portal.** A learner gets their own shell — what they owe, when
+  their next class is, how they are doing — and submits their work from it.
+  Feedback and progress reach them only once the teacher releases them, which
+  Postgres enforces rather than the interface.
 
-Not built yet: the student portal, so a learner cannot submit their own work; and
-several area screens are structure without data. See
+Not built yet: file uploads, email and calendar integration, and several area
+screens that are structure without data. See
 [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) for the honest list.
 
 Read [CLAUDE.md](CLAUDE.md), [docs/adr/0001-production-runtime-and-database.md](docs/adr/0001-production-runtime-and-database.md)
@@ -51,13 +55,14 @@ and the rest of [docs](docs) before making changes.
 | `components/planner/` | Lesson preparation — brief, rundown, readiness |
 | `components/homework/` | Homework checking — queue and marking pane |
 | `components/progress/` | Two progress-entry forms, one per track, deliberately not shared |
+| `components/student/` | The learner's own shell — a different product, not the teaching one filtered |
 | `lib/dashboard/` | The triage rules. Pure functions taking `now` explicitly, so thresholds are reviewable and testable |
 | `lib/types/` | `domain.ts` is the field-level contract the Supabase schema is derived from |
 | `lib/queries/` | Server-side reads. `mappers.ts` is pure and tested; `triage.ts` is `server-only` |
 | `lib/actions/` | Server actions. Authorization is not here — every write goes through RLS |
 | `lib/supabase/` | Browser, server and admin clients. The service-role key never reaches a client bundle |
-| `supabase/migrations/` | 11 migrations, 27 tables, RLS policies and the SECURITY DEFINER helpers |
-| `tests/` | Vitest — 210 tests, 65 of them against a real Postgres via PGlite |
+| `supabase/migrations/` | 12 migrations, 27 tables, RLS policies and the SECURITY DEFINER helpers |
+| `tests/` | Vitest — 260 tests, 83 of them against a real Postgres via PGlite |
 
 ## Start locally
 

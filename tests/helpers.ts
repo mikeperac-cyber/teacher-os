@@ -36,6 +36,7 @@ export function signal(overrides: Partial<StudentSignal> = {}): StudentSignal {
     lastActiveAt: iso(NOW),
     missedHomework: 0,
     lastProgressAt: iso(NOW),
+    hasLogin: false,
     ...overrides,
   };
 }

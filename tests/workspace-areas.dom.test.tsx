@@ -101,6 +101,7 @@ const triage = (over: Partial<TriageData> = {}): TriageData => ({
       lastActiveAt: null,
       missedHomework: 0,
       lastProgressAt: null,
+      hasLogin: false,
     },
     {
       studentId: "student-2",
@@ -111,6 +112,7 @@ const triage = (over: Partial<TriageData> = {}): TriageData => ({
       lastActiveAt: null,
       missedHomework: 0,
       lastProgressAt: null,
+      hasLogin: false,
     },
   ],
   ...over,

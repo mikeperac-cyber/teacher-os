@@ -1,0 +1,156 @@
+/* ------------------------------------------------------------------ */
+/* The learner's portal                                                */
+/* ------------------------------------------------------------------ */
+/*
+ * A single centred column rather than the teaching shell's sidebar layout.
+ * There is no navigation because there is nowhere else to go: the portal
+ * answers three questions and ends. Same tokens as the rest of the product —
+ * the greys, the 8–11px type scale, the 10–14px radii — so it reads as the same
+ * application seen from the other side, not a separate product.
+ */
+
+.student-shell {
+  min-height: 100vh;
+  background: var(--shell, #f6f6f8);
+  display: flex;
+  flex-direction: column;
+}
+
+.student-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line, #ececf0);
+  background: #fff;
+}
+
+.student-brand { display: flex; align-items: center; gap: 9px; }
+
+.student-identity { display: flex; align-items: center; gap: 14px; }
+.student-identity > span { display: flex; flex-direction: column; gap: 2px; text-align: right; }
+.student-identity strong { font-size: 11px; }
+.student-identity small { color: #979ca8; font-size: 8.5px; }
+
+.student-signout {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 32px; padding: 0 11px; border-radius: 9px;
+  border: 1px solid #e2e2e8; background: #fff; color: #6b7280;
+  font-size: 10px; font-weight: 600; font-family: inherit; cursor: pointer;
+  transition: .16s ease;
+}
+.student-signout:hover { border-color: #cfcfd8; background: #fafafa; }
+
+.student-main {
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 22px 20px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --- the two summary cards ---------------------------------------- */
+
+.student-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.student-next-body {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 0 18px 18px; color: #5b6274; font-size: 10.5px;
+}
+.student-next-body strong { font-size: 20px; letter-spacing: -.02em; color: var(--ink, #1a2036); }
+.student-next-body span { display: flex; align-items: center; gap: 6px; }
+.student-next-body svg { color: #9aa0ad; flex: 0 0 auto; }
+.student-next-body.is-empty { color: #9096a4; }
+
+/* --- homework ------------------------------------------------------ */
+
+.student-homework-list { display: flex; flex-direction: column; }
+
+.student-homework {
+  padding: 15px 18px;
+  border-top: 1px solid #f0f0f2;
+}
+.student-homework > header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; margin-bottom: 9px;
+}
+.student-homework-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.student-homework-copy strong { font-size: 11.5px; }
+.student-homework-copy small {
+  display: flex; align-items: center; gap: 5px; color: #979ca8; font-size: 9px;
+}
+
+.student-homework-state {
+  flex: 0 0 auto; padding: 5px 8px; border-radius: 7px;
+  font-size: 8.5px; font-style: normal; font-weight: 640; white-space: nowrap;
+  color: #7f8592; background: #f4f4f7;
+}
+.student-homework.is-todo .student-homework-state { color: #a56225; background: var(--amber-soft, #fdf1e3); }
+.student-homework.is-draft .student-homework-state { color: #5146bf; background: #f1efff; }
+.student-homework.is-returned .student-homework-state { color: #217d5f; background: var(--mint-soft, #dff5ec); }
+
+.student-homework-instructions {
+  margin: 0 0 11px; color: #6b7280; font-size: 10px; line-height: 1.6;
+}
+/* The form sits inside the card's padding already. */
+.student-homework .workflow-form { padding: 0; }
+
+.student-homework-done { display: flex; flex-direction: column; gap: 7px; }
+.student-answer-label { color: #777e8d; font-size: 8.5px; font-weight: 620; }
+.student-answer, .student-feedback {
+  padding: 11px 12px; border-radius: 9px; font-size: 10px; line-height: 1.65;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.student-answer { border: 1px solid #ececf0; background: #fafafa; color: #4c5362; }
+.student-feedback { border: 1px solid #cfeee2; background: var(--mint-soft, #dff5ec); color: #1f6b52; }
+.student-awaiting {
+  display: flex; align-items: center; gap: 6px; margin: 2px 0 0;
+  color: #9096a4; font-size: 9.5px;
+}
+
+/* --- progress and lessons ------------------------------------------ */
+
+.student-lower { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+
+.student-progress { padding: 0 18px 18px; }
+
+.student-skill-grid { display: flex; flex-direction: column; gap: 9px; }
+.student-skill { display: grid; grid-template-columns: 74px 1fr 38px; gap: 9px; align-items: center; }
+.student-skill b { font-size: 9px; font-weight: 600; color: #6b7280; }
+.student-skill i { height: 6px; border-radius: 6px; background: #ececf0; overflow: hidden; }
+.student-skill em { display: block; height: 100%; border-radius: inherit; background: var(--violet, #6b5ce7); }
+.student-skill strong { font-size: 9.5px; text-align: right; color: #4c5362; }
+
+.student-band-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.student-band {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 12px 8px; border-radius: 11px; background: #f7f7f9;
+}
+.student-band b { font-size: 8.5px; font-weight: 600; color: #7f8592; }
+.student-band strong { font-size: 19px; letter-spacing: -.02em; color: var(--violet, #6b5ce7); }
+
+.student-progress-note {
+  margin: 12px 0 0; padding-top: 11px; border-top: 1px solid #f0f0f2;
+  color: #6b7280; font-size: 9.5px; line-height: 1.6;
+}
+
+.student-lesson-list { display: flex; flex-direction: column; }
+.student-lesson { padding: 11px 18px; border-top: 1px solid #f0f0f2; }
+.student-lesson-when { display: flex; align-items: baseline; gap: 8px; }
+.student-lesson-when strong { font-size: 10px; }
+.student-lesson-when small { color: #979ca8; font-size: 9px; }
+.student-lesson-note {
+  display: flex; align-items: flex-start; gap: 6px; margin: 6px 0 0;
+  color: #6b7280; font-size: 9.5px; line-height: 1.55;
+}
+.student-lesson-note svg { flex: 0 0 auto; margin-top: 2px; color: #9aa0ad; }
+
+/* --- responsive ---------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .student-summary, .student-lower { grid-template-columns: 1fr; }
+  .student-main { padding: 16px 14px 48px; }
+  .student-identity > span { text-align: left; }
+}

@@ -542,6 +542,13 @@ export type StudentSignal = {
   missedHomework: number;
   /** ISO timestamp of the most recent recorded progress change. */
   lastProgressAt: string | null;
+  /**
+   * Whether this learner has a login of their own.
+   *
+   * Not a permission — `student_accounts` is. This only tells the interface
+   * whether to offer "give access" or "revoke access".
+   */
+  hasLogin: boolean;
   /** ESL only: overall CEFR mastery, 0–100, most recent last. */
   masteryHistory?: number[];
   /** IELTS only: overall band, most recent last. */

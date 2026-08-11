@@ -69,6 +69,7 @@ import { HomeworkChecking } from "@/components/homework/HomeworkChecking";
 import { LessonPlanner } from "@/components/planner/LessonPlanner";
 import { EslProgressEntry } from "@/components/progress/EslProgressEntry";
 import { IeltsBandEntry } from "@/components/progress/IeltsBandEntry";
+import { LearnerAccess } from "@/components/students/LearnerAccess";
 import type { RecordKind } from "@/lib/actions/create-record";
 import { signOutAction } from "@/lib/auth/actions";
 import { areaMetaFor } from "@/lib/content/area-meta";
@@ -991,9 +992,9 @@ function DetailedArea({
       return <TodayArea track={track} />;
     case "Students":
       return track === "ESL" ? (
-        <ESLStudentsArea announce={announce} />
+        <ESLStudentsArea announce={announce} students={triage.studentSignals} />
       ) : (
-        <IELTSStudentsArea announce={announce} />
+        <IELTSStudentsArea announce={announce} students={triage.studentSignals} />
       );
     case "Lessons":
       return <LessonsArea track={track} announce={announce} />;
@@ -1107,7 +1108,13 @@ function TodayArea({ track }: { track: Track }) {
   );
 }
 
-function ESLStudentsArea({ announce }: { announce: Announce }) {
+function ESLStudentsArea({
+  announce,
+  students,
+}: {
+  announce: Announce;
+  students: StudentSignal[];
+}) {
   const [query, setQuery] = useState("");
   const [levelGroup, setLevelGroup] = useState("All");
   const filtered = eslStudents.filter(
@@ -1205,6 +1212,7 @@ function ESLStudentsArea({ announce }: { announce: Announce }) {
         )}
       </article>
       <aside className="student-insights">
+        <LearnerAccess track="ESL" students={students} />
         <article className="panel attention-students">
           <PanelHeader kicker="ESL attention" title="Follow up this week" />
           <EmptyState
@@ -1232,7 +1240,13 @@ function ESLStudentsArea({ announce }: { announce: Announce }) {
   );
 }
 
-function IELTSStudentsArea({ announce }: { announce: Announce }) {
+function IELTSStudentsArea({
+  announce,
+  students,
+}: {
+  announce: Announce;
+  students: StudentSignal[];
+}) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("All");
   const shown = ieltsCandidates.filter(
@@ -1325,6 +1339,7 @@ function IELTSStudentsArea({ announce }: { announce: Announce }) {
         )}
       </article>
       <aside className="student-insights">
+        <LearnerAccess track="IELTS" students={students} />
         <article className="panel attention-students">
           <PanelHeader kicker="Test risk" title="Candidates to intervene" />
           <EmptyState
