@@ -70,6 +70,12 @@ import { LessonPlanner } from "@/components/planner/LessonPlanner";
 import { EslProgressEntry } from "@/components/progress/EslProgressEntry";
 import { IeltsBandEntry } from "@/components/progress/IeltsBandEntry";
 import { LearnerAccess } from "@/components/students/LearnerAccess";
+import { AssessmentEntry } from "@/components/assessments/AssessmentEntry";
+import { MaterialsLibrary } from "@/components/materials/MaterialsLibrary";
+import { ReportsContent } from "@/components/reports/ReportsContent";
+import { IntegrationPanel } from "@/components/integrations/IntegrationPanel";
+import { TeacherSubmissionModal } from "@/components/homework/TeacherSubmissionModal";
+import { LessonMaterials } from "@/components/materials/LessonMaterials";
 import type { RecordKind } from "@/lib/actions/create-record";
 import { signOutAction } from "@/lib/auth/actions";
 import { areaMetaFor } from "@/lib/content/area-meta";
@@ -1000,7 +1006,7 @@ function DetailedArea({
       return <LessonsArea track={track} announce={announce} />;
     case "Lesson Planner":
       return (
-        <LessonPlanner
+        <LessonPlannerWithMaterials
           track={track}
           workspaceId={workspaceId}
           lessons={triage.upcomingLessons}
@@ -1009,15 +1015,16 @@ function DetailedArea({
       );
     case "Homework":
       return (
-        <HomeworkChecking
+        <HomeworkWithTeacherCapture
           track={track}
           workspaceId={workspaceId}
           submissions={triage.pendingHomework}
+          students={triage.studentSignals}
           now={new Date(nowIso)}
         />
       );
     case "Assessments":
-      return <AssessmentsArea track={track} announce={announce} />;
+      return <AssessmentsWorkspace track={track} workspaceId={workspaceId} students={triage.studentSignals} announce={announce} />;
     case "ESL Progress":
       return (
         <ESLProgressArea
@@ -1041,7 +1048,7 @@ function DetailedArea({
     case "Speaking Tracker":
       return <SpeakingTrackerArea announce={announce} />;
     case "Calendar":
-      return <CalendarArea />;
+      return <CalendarWithIntegrations workspaceId={workspaceId} />;
     case "Tasks":
       return <TasksArea announce={announce} />;
     case "Goals":
@@ -1049,10 +1056,112 @@ function DetailedArea({
     case "Projects":
       return <ProjectsArea announce={announce} />;
     case "Reports":
-      return <ReportsArea track={track} announce={announce} />;
+      return <ReportsContent workspaceId={workspaceId} track={track} />;
     case "Materials":
-      return <MaterialsArea track={track} announce={announce} />;
+      return <MaterialsLibrary workspaceId={workspaceId} track={track} />;
   }
+}
+
+function LessonPlannerWithMaterials({
+  track,
+  workspaceId,
+  lessons,
+  now,
+}: {
+  track: Track;
+  workspaceId: string | null;
+  lessons: import("@/lib/types/domain").UpcomingLesson[];
+  now: Date;
+}) {
+  const selected = lessons.filter((l) => l.track === track)[0];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 17 }}>
+      <LessonPlanner track={track} workspaceId={workspaceId} lessons={lessons} now={now} />
+      {selected && workspaceId && <LessonMaterials workspaceId={workspaceId} lessonId={selected.id} />}
+      {!selected && (
+        <article className="panel" style={{ padding: 16 }}>
+          <PanelHeader kicker="Resources" title="Attach materials" />
+          <EmptyState icon={FileText} title="Schedule a lesson first" hint="Materials are attached to a specific lesson so the learner sees only what they need." />
+        </article>
+      )}
+    </div>
+  );
+}
+
+function HomeworkWithTeacherCapture({
+  track,
+  workspaceId,
+  submissions,
+  students,
+  now,
+}: {
+  track: Track;
+  workspaceId: string | null;
+  submissions: import("@/lib/types/domain").PendingHomework[];
+  students: import("@/lib/types/domain").StudentSignal[];
+  now: Date;
+}) {
+  const [showCapture, setShowCapture] = useState(false);
+  const [assignments, setAssignments] = useState<{ id: string; title: string; student_id: string; track: string }[]>([]);
+  useEffect(() => {
+    if (!workspaceId) return;
+    const load = async () => {
+      const { getBrowserClient } = await import("@/lib/supabase/browser");
+      const supabase = getBrowserClient();
+      if (!supabase) return;
+      const { data } = await supabase.from("homework_assignments").select("id, title, student_id, track").eq("workspace_id", workspaceId).limit(100);
+      setAssignments((data ?? []) as typeof assignments);
+    };
+    void load();
+    // Reload when capture closes
+    if (!showCapture) void load();
+  }, [workspaceId, showCapture]);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="secondary-button" onClick={() => setShowCapture(true)}>
+          <FileText size={14} /> Record paper submission
+        </button>
+      </div>
+      <HomeworkChecking track={track} workspaceId={workspaceId} submissions={submissions} now={now} />
+      {showCapture && (
+        <TeacherSubmissionModal workspaceId={workspaceId} students={students} assignments={assignments} close={() => setShowCapture(false)} />
+      )}
+    </div>
+  );
+}
+
+function AssessmentsWorkspace({
+  track,
+  workspaceId,
+  students,
+  announce,
+}: {
+  track: Track;
+  workspaceId: string | null;
+  students: import("@/lib/types/domain").StudentSignal[];
+  announce: import("@/lib/types/ui").Announce;
+}) {
+  return (
+    <section className="assessment-layout">
+      <article className="panel marking-queue">
+        <PanelHeader kicker={track === "ESL" ? "Mastery review queue" : "Mock marking queue"} title={track === "ESL" ? "ESL progress checks" : "IELTS mocks and timed sections"} />
+        <AssessmentEntry workspaceId={workspaceId} students={students} track={track} />
+      </article>
+      <aside className="assessment-side">
+        <AssessmentsArea track={track} announce={announce} />
+      </aside>
+    </section>
+  );
+}
+
+function CalendarWithIntegrations({ workspaceId }: { workspaceId: string | null }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 17 }}>
+      <CalendarArea />
+      <IntegrationPanel workspaceId={workspaceId} />
+    </div>
+  );
 }
 
 function TodayArea({ track }: { track: Track }) {

@@ -43,6 +43,7 @@ import { SUBJECT_LABELS, validateDraft } from "@/lib/actions/create-record";
 import type { FieldErrors, RecordKind } from "@/lib/actions/create-record";
 import type { StudentSignal } from "@/lib/types/domain";
 import type { Track } from "@/lib/types/ui";
+import { AssessmentEntry } from "@/components/assessments/AssessmentEntry";
 
 type QuickAction = {
   kind: RecordKind;
@@ -333,22 +334,10 @@ export function CreateRecordModal({
 
         {kind === "assessment" ? (
           <div className="create-modal-body">
-            <p className="create-modal-pending" role="status">
-              <AlertCircle size={15} />
-              <span>
-                This screen is not built yet. Recording{" "}
-                {track === "ESL" ? "a progress check" : "a mock result"} needs a
-                set of criteria to score against —{" "}
-                {track === "ESL"
-                  ? "CEFR mastery across each language system"
-                  : "the four official band criteria"}{" "}
-                — which is more than this form can ask for. It will live in
-                Assessments.
-              </span>
-            </p>
-            <div className="create-modal-actions">
-              <button type="button" className="primary-button" onClick={close}>
-                Understood <ArrowRight size={15} />
+            <AssessmentEntry workspaceId={workspaceId} students={students} track={track} />
+            <div className="create-modal-actions" style={{ marginTop: 12 }}>
+              <button type="button" className="secondary-button" onClick={close}>
+                Close
               </button>
             </div>
           </div>

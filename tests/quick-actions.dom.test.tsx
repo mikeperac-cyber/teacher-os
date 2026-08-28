@@ -260,21 +260,22 @@ describe("assigning homework", () => {
 });
 
 describe("the screen that is not built", () => {
+  // Now built: assessment recording uses track-specific rubrics (0014)
   it("says what recording an assessment still needs", () => {
     setup("IELTS");
     fireEvent.click(screen.getByText("Record mock"));
 
-    const status = screen.getByRole("status");
-    expect(status.textContent).toContain("not built yet");
-    expect(status.textContent).toContain("band criteria");
-    // No form, so nothing to mistakenly fill in.
-    expect(screen.queryByRole("textbox")).toBeNull();
+    // The modal now shows the real assessment form, not a "not built yet" placeholder.
+    expect(screen.getByRole("dialog")).toBeDefined();
+    expect(screen.getByText("Record mock / criterion scores")).toBeDefined();
+    expect(screen.getByPlaceholderText("Mock — Full test 12 Oct")).toBeDefined();
   });
 
   it("names the ESL equivalent instead on the ESL track", () => {
     setup("ESL");
     fireEvent.click(screen.getByText("Record check"));
-    expect(screen.getByRole("status").textContent).toContain("CEFR mastery");
+    expect(screen.getByText("Record progress check")).toBeDefined();
+    expect(screen.getByPlaceholderText("Progress check — Unit 4")).toBeDefined();
   });
 });
 

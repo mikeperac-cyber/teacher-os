@@ -775,6 +775,33 @@ button { color: inherit; }
   .destination-shortcuts { grid-template-columns: 1fr 1fr 1fr; }
 }
 
+/* File uploads */
+.file-upload { margin: 10px 0; }
+.file-drop { min-height: 88px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px; border: 1.5px dashed #cfcddf; border-radius: 12px; background: #f9f8ff; cursor: pointer; text-align: center; transition: .15s; }
+.file-drop:hover { border-color: #a9a5d8; background: #f6f5fb; }
+.file-upload.is-dragging .file-drop { border-color: var(--violet); background: var(--violet-soft); }
+.file-drop span { font-size: 11px; font-weight: 650; color: var(--violet-dark); }
+.file-drop small { font-size: 10px; color: #6f7789; }
+.file-status { margin: 6px 0 0; display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.file-status.is-error { color: #b85252; }
+.file-status.is-success { color: #217d5f; }
+.file-status.is-uploading { color: #5146bf; }
+.attached-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid #f0f0f2; }
+.attached-item button { margin-left: auto; border: 0; background: transparent; color: #9a9fab; cursor: pointer; }
+.workflow-hint { color: #6f7789; font-size: 11px; margin: 8px 0; }
+.score-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (max-width: 680px) { .score-grid { grid-template-columns: 1fr; } }
+.integrations-workspace { display: flex; flex-direction: column; gap: 17px; }
+.workflow-form label { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.workflow-form label > span { font-size: 11px; color: #60697b; font-weight: 600; }
+.workflow-form input, .workflow-form textarea, .workflow-form select { width: 100%; padding: 9px 11px; border: 1px solid #dedee4; border-radius: 9px; background: #fff; font-size: 12px; }
+.workflow-form textarea.tall { min-height: 100px; }
+.workflow-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.create-modal-error { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 9px; background: #ffebeb; color: #b85252; font-size: 11px; }
+.create-modal-notice { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 9px; background: #e7f7f1; color: #217d5f; font-size: 11px; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }

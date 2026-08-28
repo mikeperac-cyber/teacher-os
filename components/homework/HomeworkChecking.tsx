@@ -38,6 +38,7 @@ import { recordFeedback } from "@/lib/actions/workflow";
 import { dueLabel } from "@/lib/dashboard/time";
 import type { PendingHomework } from "@/lib/types/domain";
 import type { Track } from "@/lib/types/ui";
+import { FileUpload } from "@/components/files/FileUpload";
 
 export function HomeworkChecking({
   track,
@@ -184,13 +185,26 @@ function CheckingPane({
         }
       />
 
-      <div className="checking-body">
+        <div className="checking-body">
         <span className="checking-label">What they submitted</span>
         {submission.body.trim() ? (
           <div className="checking-submission">{submission.body}</div>
         ) : (
           <div className="checking-submission is-empty">
             Nothing written — the learner submitted without text.
+          </div>
+        )}
+        {workspaceId && (
+          <div style={{ margin: "12px 0" }}>
+            <FileUpload
+              workspaceId={workspaceId}
+              studentId={submission.studentId}
+              submissionId={submission.id}
+              bucketId="homework-submissions"
+              label="Attach feedback file (optional)"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.docx"
+              maxSizeMB={25}
+            />
           </div>
         )}
 

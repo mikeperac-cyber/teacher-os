@@ -41,6 +41,7 @@ import type {
   StudentHomeworkState,
   StudentSnapshot,
 } from "@/lib/types/student";
+import { FileUpload } from "@/components/files/FileUpload";
 
 const STATE_LABEL: Record<StudentHomeworkState, string> = {
   todo: "To do",
@@ -324,6 +325,16 @@ function HomeworkItem({
               placeholder="Write your answer here"
             />
           </label>
+
+          <FileUpload
+            workspaceId={workspaceId}
+            studentId={studentId}
+            bucketId="homework-submissions"
+            label="Attach a file to your submission"
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.mp3,.mp4,.wav,.webm,.ogg,.txt,.docx"
+            maxSizeMB={25}
+            onUploaded={() => setMessage("File attached. Send to teacher to include it.")}
+          />
 
           {status === "failed" && message && (
             <p className="create-modal-error" role="alert">

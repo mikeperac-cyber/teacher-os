@@ -268,6 +268,25 @@ export async function assignHomework(input: {
 
   if (error) return { ok: false, error: describeError(error) };
 
+  // Best-effort email to the learner (does not block the assignment).
+  try {
+    const { data: student } = await context.supabase
+      .from("students")
+      .select("full_name, email")
+      .eq("id", input.studentId)
+      .single();
+    if (student?.email) {
+      const { notifyHomeworkAssigned } = await import("@/lib/integrations/email");
+      void notifyHomeworkAssigned({
+        learnerEmail: student.email,
+        learnerName: student.full_name,
+        title: input.title.trim(),
+        dueAt: input.dueAt ?? null,
+        instructions: input.instructions,
+      }).catch(() => {});
+    }
+  } catch {}
+
   revalidatePath("/");
   return { ok: true, data: { assignmentId: data.id as string } };
 }
@@ -306,6 +325,49 @@ export async function submitHomework(input: {
         student_id: input.studentId,
         body: input.body,
         status: input.submit ? "submitted" : "draft",
+      },
+      { onConflict: "assignment_id" },
+    )
+    .select("id")
+    .single();
+
+  if (error) return { ok: false, error: describeError(error) };
+
+  revalidatePath("/");
+  return { ok: true, data: { submissionId: data.id as string } };
+}
+
+/**
+ * Teacher records a submission on behalf of a learner.
+ *
+ * Covers paper homework, email, or in-class work where the learner has no
+ * portal submission. Staff-only via RLS (0013_teacher_submissions.sql).
+ * `status` defaults to `submitted` so it appears in the checking queue; the
+ * teacher may also set `returned` when transcribing already-marked paper work.
+ */
+export async function recordSubmissionOnBehalf(input: {
+  workspaceId: string;
+  assignmentId: string;
+  studentId: string;
+  body: string;
+  status?: "draft" | "submitted" | "checking" | "returned";
+}): Promise<ActionResult<{ submissionId: string }>> {
+  if (!input.body.trim()) {
+    return { ok: false, error: "Write what the learner submitted.", field: "body" };
+  }
+
+  const context = await client();
+  if (!context) return { ok: false, error: NOT_CONNECTED };
+
+  const { data, error } = await context.supabase
+    .from("homework_submissions")
+    .upsert(
+      {
+        workspace_id: input.workspaceId,
+        assignment_id: input.assignmentId,
+        student_id: input.studentId,
+        body: input.body.trim(),
+        status: input.status ?? "submitted",
       },
       { onConflict: "assignment_id" },
     )
@@ -379,6 +441,26 @@ export async function recordFeedback(input: {
         error: `Feedback was saved and released, but the homework could not be marked returned: ${describeError(returnError)}`,
       };
     }
+
+    // Best-effort email notification when feedback is released.
+    try {
+      const { data: assignment } = await supabase
+        .from("homework_submissions")
+        .select("homework_assignments ( title ), students ( full_name, email )")
+        .eq("id", input.submissionId)
+        .single();
+      const a = assignment as unknown as { homework_assignments: { title: string } | null; students: { full_name: string; email: string | null } | null } | null;
+      const email = a?.students?.email;
+      if (email) {
+        const { notifyFeedbackReleased } = await import("@/lib/integrations/email");
+        void notifyFeedbackReleased({
+          learnerEmail: email,
+          learnerName: a?.students?.full_name ?? "Learner",
+          task: a?.homework_assignments?.title ?? "Homework",
+          feedback: input.body.trim(),
+        }).catch(() => {});
+      }
+    } catch {}
   }
 
   revalidatePath("/");
